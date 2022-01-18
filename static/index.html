@@ -110,7 +110,7 @@
         }
 
         bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
-            Sphere sphere_list[2] = Sphere[2](
+            Sphere sphere_list[] = Sphere[2](
                 Sphere(vec3(0., 0., -1.), 0.5),
                 Sphere(vec3(0., -100.5, -1.), 100.)
             );
