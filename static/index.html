@@ -48,23 +48,32 @@
 
         in vec2 v_position;
 
-        bool hit_sphere(in vec3 center, in float radius, in Ray r) {
-            vec3 oc = r.origin - center;
+        vec3 ray_at(in Ray r, float hit_t) {
+            return r.origin + r.direction * hit_t;
+        }
+
+        float hit_sphere(in vec3 sphere_center, in float sphere_radius, in Ray r) {
+            vec3 oc = r.origin - sphere_center;
             float a = dot(r.direction, r.direction);
             float b = 2.0 * dot(oc, r.direction);
-            float c = dot(oc, oc) - radius * radius;
+            float c = dot(oc, oc) - sphere_radius * sphere_radius;
             float discriminant = b * b - 4. * a * c;
-            return discriminant > 0.;
+            if (discriminant < 0.) {
+                return -1.0;
+            } else {
+                return (-b - sqrt(discriminant)) / (2.0 * a);
+            }
         }
 
         vec3 ray_color(in Ray r) {
             vec3 sphere_center = vec3(0., 0., -1.);
-            float radius = 0.5;
+            float sphere_radius = 0.5;
 
-            bool hit = hit_sphere(sphere_center, radius, r);
-
-            if (hit) {
-                return vec3(1., 0., 0.);
+            float hit_t = hit_sphere(sphere_center, sphere_radius, r);
+             if (hit_t > 0.) {
+                vec3 hit_point = ray_at(r, hit_t);
+                vec3 normal = normalize(hit_point - sphere_center);
+                return (normal + 1.) * 0.5;
             }
 
             vec3 unit_direction = normalize(r.direction);
