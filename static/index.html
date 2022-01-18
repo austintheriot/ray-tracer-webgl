@@ -222,12 +222,13 @@
             int samples_per_pixel = 100;
             float aspect_ratio = u_width / u_height;
             float viewport_height = 2.0;
-            float viewport_width = aspect_ratio * viewport_height;
             float focal_length = 1.0;
             vec3 camera_origin = vec3(0.);
+            float viewport_width = aspect_ratio * viewport_height;
             vec3 viewport_horizontal_vec = vec3(viewport_width, 0., 0.);
             vec3 viewport_vertical_vec = vec3(0., viewport_height, 0.);
             vec3 lower_left_corner = camera_origin - viewport_horizontal_vec / 2. - viewport_vertical_vec / 2. - vec3(0., 0., focal_length);
+            
             // this seed initialization is by reinder https://www.shadertoy.com/view/llVcDz
             global_seed = float(base_hash(floatBitsToUint(v_position))) / float(0xffffffffU) + u_time;
 

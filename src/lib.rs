@@ -1,13 +1,16 @@
 #![feature(format_args_capture)]
 extern crate console_error_panic_hook;
-
-use log::info;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlScriptElement, WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
 pub const WIDTH: u32 = 1600;
 pub const HEIGHT: u32 = 900;
+pub const BYTES_PER_PIXEL: u32 = 4;
+pub const ASPECT_RATIO: f64 = (WIDTH as f64) / (HEIGHT as f64);
+pub const SAMPLES_PER_PIXEL: u32 = 100;
+pub const MAX_DEPTH: u32 = 50;
+
 pub const VERTICES: [f32; 12] = [
     -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
 ];
@@ -111,9 +114,20 @@ pub fn main() -> Result<(), JsValue> {
 
     // GET LOCATIONS
     let vertex_attribute_position = gl.get_attrib_location(&program, "a_position") as u32;
-    let width_uniform_location = gl.get_uniform_location(&program, "u_width");
-    let height_uniform_location = gl.get_uniform_location(&program, "u_height");
-    let time_uniform_location = gl.get_uniform_location(&program, "u_time");
+    let width_u_location = gl.get_uniform_location(&program, "u_width");
+    let height_u_location = gl.get_uniform_location(&program, "u_height");
+    let time_u_location = gl.get_uniform_location(&program, "u_time");
+    let samples_per_pixel_u_location = gl.get_uniform_location(&program, "u_samples_per_pixel");
+    let aspect_ratio_u_location = gl.get_uniform_location(&program, "u_aspect_ratio");
+    let viewport_height_u_location = gl.get_uniform_location(&program, "u_viewport_height");
+    let viewport_width_u_location = gl.get_uniform_location(&program, "u_viewport_width");
+    let focal_length_u_location = gl.get_uniform_location(&program, "u_focal_length");
+    let camera_origin_u_location = gl.get_uniform_location(&program, "u_camera_origin");
+    let viewport_horizontal_vec_u_location =
+        gl.get_uniform_location(&program, "u_viewport_horizontal_vec");
+    let viewport_vertical_vec_u_location =
+        gl.get_uniform_location(&program, "u_viewport_vertical_vec");
+    let lower_left_corner_u_location = gl.get_uniform_location(&program, "u_lower_left_corner");
 
     // SET VERTEX BUFFER
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
@@ -135,12 +149,25 @@ pub fn main() -> Result<(), JsValue> {
     );
 
     // SET UNIFORMS
-    gl.uniform1f(width_uniform_location.as_ref(), WIDTH as f32);
-    gl.uniform1f(height_uniform_location.as_ref(), HEIGHT as f32);
+    gl.uniform1f(width_u_location.as_ref(), WIDTH as f32);
+    gl.uniform1f(height_u_location.as_ref(), HEIGHT as f32);
     gl.uniform1f(
-        time_uniform_location.as_ref(),
+        time_u_location.as_ref(),
         window.performance().unwrap().now() as f32,
     );
+    // int samples_per_pixel = 100;
+    gl.uniform1f(
+        samples_per_pixel_u_location.as_ref(),
+        SAMPLES_PER_PIXEL as f32,
+    );
+    // float aspect_ratio = u_width / u_height;
+    // float viewport_height = 2.0;
+    // float focal_length = 1.0;
+    // vec3 camera_origin = vec3(0.);
+    // float viewport_width = aspect_ratio * viewport_height;
+    // vec3 viewport_horizontal_vec = vec3(viewport_width, 0., 0.);
+    // vec3 viewport_vertical_vec = vec3(0., viewport_height, 0.);
+    // vec3 lower_left_corner = camera_origin - viewport_horizontal_vec / 2. - viewport_vertical_vec / 2. - vec3(0., 0., focal_length);
 
     // RENDER
     gl.clear_color(0.0, 0.0, 0.0, 1.0);
