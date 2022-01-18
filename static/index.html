@@ -54,10 +54,15 @@
         vec4 hash4(uint n){return vec4(hash(n)*uvec4(0x1U,0x7fU,0x3fffU,0x1fffffU))*F0;}
 
 
-        // START //////////////////////////////////////////////////////
+        // INPUTS / OUTPUTS //////////////////////////////////////////////////////
         uniform float u_width;
         uniform float u_height;
+        
+        out vec4 o_color;
+        
+        in vec2 v_position;
 
+        // STRUCTS //////////////////////////////////////////////////////
         struct Ray {
             vec3 origin;
             vec3 direction;
@@ -74,11 +79,8 @@
             vec3 normal;
             bool front_face;
         };
-
-        out vec4 o_color;
-
-        in vec2 v_position;
-
+        
+        // FUNCTIONS //////////////////////////////////////////////////////
         vec3 ray_at(in Ray r, float hit_t) {
             return r.origin + r.direction * hit_t;
         }
@@ -87,6 +89,7 @@
             return pow(length(v), 2.);
         }
 
+        // records whether a hit happened to the front or back face of an object
         void set_hit_record_front_face(inout HitRecord hit_record, in Ray r, in vec3 outward_normal) {
             hit_record.front_face = dot(r.direction, outward_normal) < 0.;
             if (hit_record.front_face) {
@@ -129,11 +132,14 @@
         }
 
         bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
+            // make list of hittable geometry
             Sphere sphere_list[] = Sphere[2](
                 Sphere(vec3(0., 0., -1.), 0.5),
                 Sphere(vec3(0., -100.5, -1.), 100.)
             );
             
+            // test whether any geometry was hit. If it was, the hit_record will be updated with
+            // the new hit data if the new hit was closer to the camera than the previous hit
             bool hit = false;
             for (int i = 0; i < sphere_list.length(); i++) {
                 Sphere sphere = sphere_list[i];
@@ -143,25 +149,26 @@
             return hit;
         }
 
+        // determine the color that a ray should be
         vec3 ray_color(in Ray r) {
-            Sphere sphere_1 = Sphere(vec3(0., 0., -1.), 0.5);
             float max_t = 10000000000.;
             float min_t = 0.001;
 
+            // test for collisions with any geometry
             // hit record gets modified with hit details if there was a hit
             HitRecord hit_record = HitRecord(vec3(0., 0., -max_t), 0., vec3(0.), false);
-            bool was_hit = hit_world(r, min_t, max_t, hit_record);
-            if (was_hit) {
+            if (hit_world(r, min_t, max_t, hit_record)) {
                 return (hit_record.normal + 1.) * 0.5;
             }
 
+            // gradient background
             vec3 unit_direction = normalize(r.direction);
             float t = 0.5 * (unit_direction.y + 1.0);
             return mix(vec3(1.0, 1.0, 1.0), vec3(0.5, 0.7, 1.0), t);
         }
         
         void main() {
-            // these can be initialized as uniforms instead
+            // @todo: these can be initialized as uniforms instead
             int samples_per_pixel = 500;
             float aspect_ratio = u_width / u_height;
             float viewport_height = 2.0;
