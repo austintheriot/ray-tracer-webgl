@@ -53,6 +53,7 @@
             vec3 hit_point;
             float hit_t;
             vec3 normal;
+            bool front_face;
         };
 
         out vec4 o_color;
@@ -65,6 +66,15 @@
 
         float length_squared(in vec3 v) {
             return pow(length(v), 2.);
+        }
+
+        void set_hit_record_front_face(inout HitRecord hit_record, in Ray r, in vec3 outward_normal) {
+            hit_record.front_face = dot(r.direction, outward_normal) < 0.;
+            if (hit_record.front_face) {
+                hit_record.normal = outward_normal;
+            } else {
+                hit_record.normal = -outward_normal;
+            }
         }
 
         bool hit_sphere(in Sphere sphere, in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
@@ -90,7 +100,8 @@
             // hit is within acceptable range: calculate hit point, normal, and t
             hit_record.hit_t = root;
             hit_record.hit_point = ray_at(r, hit_record.hit_t);
-            hit_record.normal = (hit_record.hit_point - sphere.center) / sphere.radius;
+            vec3 outward_normal = (hit_record.hit_point - sphere.center) / sphere.radius;
+            set_hit_record_front_face(hit_record, r, outward_normal);
 
            return true;
         }
@@ -99,7 +110,7 @@
             Sphere sphere_1 = Sphere(vec3(0., 0., -1.), 0.5);
 
             // hit record gets modified with hit details if there was a hit
-            HitRecord hit_record = HitRecord(vec3(0.), 0., vec3(0.));
+            HitRecord hit_record = HitRecord(vec3(0.), 0., vec3(0.), false);
             bool was_hit = hit_sphere(sphere_1, r, 0.001, 100000., hit_record);
             if (was_hit) {
                 return (hit_record.normal + 1.) * 0.5;
