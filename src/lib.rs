@@ -4,7 +4,7 @@ extern crate console_error_panic_hook;
 use log::info;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{HtmlScriptElement, WebGlProgram, WebGlRenderingContext, WebGlShader};
+use web_sys::{HtmlScriptElement, WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
 pub const WIDTH: u32 = 1600;
 pub const HEIGHT: u32 = 900;
@@ -13,50 +13,50 @@ pub const VERTICES: [f32; 12] = [
 ];
 
 pub fn compile_shader(
-    ctx: &WebGlRenderingContext,
+    gl: &WebGl2RenderingContext,
     shader_type: u32,
     source: &str,
 ) -> Result<WebGlShader, String> {
-    let shader = ctx
+    let shader = gl
         .create_shader(shader_type)
         .ok_or_else(|| String::from("Unable to create shader object"))?;
-    ctx.shader_source(&shader, source);
-    ctx.compile_shader(&shader);
+    gl.shader_source(&shader, source);
+    gl.compile_shader(&shader);
 
-    if ctx
-        .get_shader_parameter(&shader, WebGlRenderingContext::COMPILE_STATUS)
+    if gl
+        .get_shader_parameter(&shader, WebGl2RenderingContext::COMPILE_STATUS)
         .as_bool()
         .unwrap_or(false)
     {
         Ok(shader)
     } else {
-        Err(ctx
+        Err(gl
             .get_shader_info_log(&shader)
             .unwrap_or_else(|| String::from("Unknown error creating shader")))
     }
 }
 
 pub fn link_program(
-    ctx: &WebGlRenderingContext,
+    gl: &WebGl2RenderingContext,
     vert_shader: &WebGlShader,
     frag_shader: &WebGlShader,
 ) -> Result<WebGlProgram, String> {
-    let program = ctx
+    let program = gl
         .create_program()
         .ok_or_else(|| String::from("Unable to create shader object"))?;
 
-    ctx.attach_shader(&program, vert_shader);
-    ctx.attach_shader(&program, frag_shader);
-    ctx.link_program(&program);
+    gl.attach_shader(&program, vert_shader);
+    gl.attach_shader(&program, frag_shader);
+    gl.link_program(&program);
 
-    if ctx
-        .get_program_parameter(&program, WebGlRenderingContext::LINK_STATUS)
+    if gl
+        .get_program_parameter(&program, WebGl2RenderingContext::LINK_STATUS)
         .as_bool()
         .unwrap_or(false)
     {
         Ok(program)
     } else {
-        Err(ctx
+        Err(gl
             .get_program_info_log(&program)
             .unwrap_or_else(|| String::from("Unknown error creating program object")))
     }
@@ -77,10 +77,10 @@ pub fn main() -> Result<(), JsValue> {
         .unwrap()
         .dyn_into::<web_sys::HtmlCanvasElement>()?;
 
-    let ctx = canvas
-        .get_context("webgl")?
+    let gl = canvas
+        .get_context("webgl2")?
         .unwrap()
-        .dyn_into::<WebGlRenderingContext>()?;
+        .dyn_into::<WebGl2RenderingContext>()?;
 
     canvas.set_attribute("width", &WIDTH.to_string())?;
     canvas.set_attribute("height", &HEIGHT.to_string())?;
@@ -92,7 +92,7 @@ pub fn main() -> Result<(), JsValue> {
             .unwrap()
             .dyn_into::<HtmlScriptElement>()?
             .text()?;
-        compile_shader(&ctx, WebGlRenderingContext::VERTEX_SHADER, shader_source).unwrap()
+        compile_shader(&gl, WebGl2RenderingContext::VERTEX_SHADER, shader_source).unwrap()
     };
     let fragment_shader = {
         let shader_source = &document
@@ -100,29 +100,41 @@ pub fn main() -> Result<(), JsValue> {
             .unwrap()
             .dyn_into::<HtmlScriptElement>()?
             .text()?;
-        compile_shader(&ctx, WebGlRenderingContext::FRAGMENT_SHADER, shader_source).unwrap()
+        compile_shader(&gl, WebGl2RenderingContext::FRAGMENT_SHADER, shader_source).unwrap()
     };
-    let program = link_program(&ctx, &vertex_shader, &fragment_shader)?;
-    ctx.use_program(Some(&program));
+    let program = link_program(&gl, &vertex_shader, &fragment_shader)?;
+    gl.use_program(Some(&program));
+
+    // SETUP VAO
+    let vao = gl.create_vertex_array().ok_or("Couldn't create vao")?;
+    gl.bind_vertex_array(Some(&vao));
 
     // SETUP VERTEX BUFFER
-    let buffer = ctx.create_buffer().ok_or("failed to create buffer")?;
-    ctx.bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, Some(&buffer));
-    let vert_array = unsafe { js_sys::Float32Array::view(&VERTICES) };
-    ctx.buffer_data_with_array_buffer_view(
-        WebGlRenderingContext::ARRAY_BUFFER,
-        &vert_array,
-        WebGlRenderingContext::STATIC_DRAW,
+    let vertex_attribute_position = gl.get_attrib_location(&program, "a_position") as u32;
+    let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
+    gl.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&buffer));
+    let vertex_array = unsafe { js_sys::Float32Array::view(&VERTICES) };
+    gl.buffer_data_with_array_buffer_view(
+        WebGl2RenderingContext::ARRAY_BUFFER,
+        &vertex_array,
+        WebGl2RenderingContext::STATIC_DRAW,
     );
-    ctx.vertex_attrib_pointer_with_i32(0, 2, WebGlRenderingContext::FLOAT, false, 0, 0);
-    ctx.enable_vertex_attrib_array(0);
+    gl.enable_vertex_attrib_array(vertex_attribute_position);
+    gl.vertex_attrib_pointer_with_i32(
+        vertex_attribute_position,
+        2,
+        WebGl2RenderingContext::FLOAT,
+        false,
+        0,
+        0,
+    );
 
     // RENDER
-    ctx.clear_color(0.0, 0.0, 0.0, 1.0);
-    ctx.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
-    ctx.viewport(0, 0, canvas.width() as i32, canvas.height() as i32);
-    ctx.draw_arrays(
-        WebGlRenderingContext::TRIANGLES,
+    gl.clear_color(0.0, 0.0, 0.0, 1.0);
+    gl.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
+    gl.viewport(0, 0, canvas.width() as i32, canvas.height() as i32);
+    gl.draw_arrays(
+        WebGl2RenderingContext::TRIANGLES,
         0,
         (VERTICES.len() / 2) as i32,
     );
