@@ -36,6 +36,26 @@
     <script id="fragment-shader" type="x-shader/x-fragment">#version 300 es
         precision highp float;
 
+        // PSEUDO-RANDOM NUMBER GENERATORS //////////////////////////////////////////////////////
+        #define M1 1597334677U     //1719413*929
+        #define M2 3812015801U     //140473*2467*11
+        #define M3 3299493293U     //467549*7057
+
+        #define F0 (1.0/float(0xffffffffU))
+
+        #define hash(n) n*(n^(n>>15))
+
+        #define coord1(p) (p*M1)
+        #define coord2(p) (p.x*M1^p.y*M2)
+        #define coord3(p) (p.x*M1^p.y*M2^p.z*M3)
+
+        float hash1(uint n){return float(hash(n))*F0;}
+        vec2 hash2(uint n){return vec2(hash(n)*uvec2(0x1U,0x3fffU))*F0;}
+        vec3 hash3(uint n){return vec3(hash(n)*uvec3(0x1U,0x1ffU,0x3ffffU))*F0;}
+        vec4 hash4(uint n){return vec4(hash(n)*uvec4(0x1U,0x7fU,0x3fffU,0x1fffffU))*F0;}
+
+
+        // START //////////////////////////////////////////////////////
         uniform float u_width;
         uniform float u_height;
 
@@ -142,7 +162,8 @@
         }
         
         void main() {
-            // these could be initialized as uniforms
+            // these can be initialized as uniforms instead
+            int samples_per_pixel = 100;
             float aspect_ratio = u_width / u_height;
             float viewport_height = 2.0;
             float viewport_width = aspect_ratio * viewport_height;
@@ -152,16 +173,32 @@
             vec3 viewport_vertical_vec = vec3(0., viewport_height, 0.);
             vec3 lower_left_corner = camera_origin - viewport_horizontal_vec / 2. - viewport_vertical_vec / 2. - vec3(0., 0., focal_length);
 
-            // map from -1->1 to 0->1
+            // get current position on viewport, mapped from -1->1 to 0->1
+            // (i.e. percentage of width, percentage of height)
             vec2 uv = (v_position + 1.) * 0.5;
-            
-            // create ray from camera origin to viewport
-            vec3 ray_direction = lower_left_corner + uv.x * viewport_horizontal_vec + uv.y * viewport_vertical_vec - camera_origin;
-            Ray r = Ray(camera_origin, ray_direction);
-            
-            // determine color by shooting ray
-            vec3 color = ray_color(r);
 
+            // accumulate color per pixel
+            vec3 color = vec3(0.);
+            for (int i = 0; i < samples_per_pixel; i++) {
+                uint random_seed = floatBitsToUint(uv.x * uv.y * 1000. * float(i));
+                vec2 random = hash2(random_seed);
+                vec2 random_within_pixel = random / vec2(u_width, u_height);
+
+                // uv +/- the value of 1 pixel
+                vec2 randomized_uv = uv + random_within_pixel;
+
+                // create ray from camera origin to viewport
+                vec3 ray_direction = lower_left_corner + randomized_uv.x * viewport_horizontal_vec + randomized_uv.y * viewport_vertical_vec - camera_origin;
+                Ray r = Ray(camera_origin, ray_direction);
+
+
+                color += ray_color(r);
+            }
+
+            // scale color by number of samples
+            float scale = (1. / float(samples_per_pixel));
+            color *= scale;
+        
             o_color = vec4(color, 1.);
           }
       </script>
