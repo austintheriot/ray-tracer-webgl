@@ -256,6 +256,9 @@
             // scale color by number of samples
             float scale = (1. / float(samples_per_pixel));
             color *= scale;
+
+            // gamma correction
+            color = sqrt(color);
         
             o_color = vec4(color, 1.);
           }
