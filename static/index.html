@@ -36,13 +36,46 @@
     <script id="fragment-shader" type="x-shader/x-fragment">#version 300 es
         precision highp float;
 
+        uniform float u_width;
+        uniform float u_height;
+
+        struct Ray {
+            vec3 origin;
+            vec3 direction;
+        };
+
         out vec4 o_color;
 
         in vec2 v_position;
+
+        vec3 ray_color(in Ray r) {
+            vec3 unit_direction = normalize(r.direction);
+            float t = 0.5 * (unit_direction.y + 1.0);
+            return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+        }
         
         void main() {
-            vec2 color = (v_position + 1.) * 0.5;
-            o_color = vec4(color, 0.25, 1.0);
+            // these could be initialized as uniforms
+            float aspect_ratio = u_width / u_height;
+            float viewport_height = 2.0;
+            float viewport_width = aspect_ratio * viewport_height;
+            float focal_length = 1.0;
+            vec3 camera_origin = vec3(0.);
+            vec3 viewport_horizontal_vec = vec3(viewport_width, 0., 0.);
+            vec3 viewport_vertical_vec = vec3(0., viewport_height, 0.);
+            vec3 lower_left_corner = camera_origin - viewport_horizontal_vec / 2. - viewport_vertical_vec / 2. - vec3(0., 0., focal_length);
+
+            // map from -1->1 to 0->1
+            vec2 uv = (v_position + 1.) * 0.5;
+            
+            // create ray from camera origin to viewport
+            vec3 ray_direction = lower_left_corner + uv.x * viewport_horizontal_vec + uv.y * viewport_vertical_vec - camera_origin;
+            Ray r = Ray(camera_origin, ray_direction);
+            
+            // determine color by shooting ray
+            vec3 color = ray_color(r);
+
+            o_color = vec4(color, 1.);
           }
       </script>
 </body>

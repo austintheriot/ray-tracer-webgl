@@ -82,8 +82,8 @@ pub fn main() -> Result<(), JsValue> {
         .unwrap()
         .dyn_into::<WebGl2RenderingContext>()?;
 
-    canvas.set_attribute("width", &WIDTH.to_string())?;
-    canvas.set_attribute("height", &HEIGHT.to_string())?;
+    canvas.set_width(WIDTH);
+    canvas.set_height(HEIGHT);
 
     //  SETUP PROGRAM
     let vertex_shader = {
@@ -109,8 +109,12 @@ pub fn main() -> Result<(), JsValue> {
     let vao = gl.create_vertex_array().ok_or("Couldn't create vao")?;
     gl.bind_vertex_array(Some(&vao));
 
-    // SETUP VERTEX BUFFER
+    // GET LOCATIONS
     let vertex_attribute_position = gl.get_attrib_location(&program, "a_position") as u32;
+    let width_uniform_location = gl.get_uniform_location(&program, "u_width");
+    let height_uniform_location = gl.get_uniform_location(&program, "u_height");
+
+    // SET VERTEX BUFFER
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
     gl.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&buffer));
     let vertex_array = unsafe { js_sys::Float32Array::view(&VERTICES) };
@@ -129,10 +133,14 @@ pub fn main() -> Result<(), JsValue> {
         0,
     );
 
+    // SET UNIFORMS
+    gl.uniform1f(width_uniform_location.as_ref(), WIDTH as f32);
+    gl.uniform1f(height_uniform_location.as_ref(), HEIGHT as f32);
+
     // RENDER
     gl.clear_color(0.0, 0.0, 0.0, 1.0);
+    gl.viewport(0, 0, WIDTH as i32, HEIGHT as i32);
     gl.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
-    gl.viewport(0, 0, canvas.width() as i32, canvas.height() as i32);
     gl.draw_arrays(
         WebGl2RenderingContext::TRIANGLES,
         0,
