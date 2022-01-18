@@ -49,6 +49,12 @@
             float radius;
         };
 
+        struct HitRecord {
+            vec3 hit_point;
+            float hit_t;
+            vec3 normal;
+        };
+
         out vec4 o_color;
 
         in vec2 v_position;
@@ -61,27 +67,42 @@
             return pow(length(v), 2.);
         }
 
-        float hit_sphere(in Sphere sphere, in Ray r) {
+        bool hit_sphere(in Sphere sphere, in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
             vec3 oc = r.origin - sphere.center;
             float a = length_squared(r.direction);
             float half_b = dot(oc, r.direction);
             float c = length_squared(oc) - pow(sphere.radius, 2.);
             float discriminant = pow(half_b, 2.) - a * c;
-            if (discriminant < 0.) {
-                return -1.0;
-            } else {
-                return (-half_b - sqrt(discriminant) ) / a;
+
+            // no hit
+            if (discriminant < 0.) return false;
+
+            // there was a hit, but it's not within an acceptable range
+            float sqrtd = sqrt(discriminant);
+            float root = (-half_b - sqrtd) / a;
+            if (root < t_min || t_max < root) {
+                root = (-half_b + sqrtd) / a;
+                if (root < t_min || t_max < root) {
+                    return false;
+                }
             }
+
+            // hit is within acceptable range: calculate hit point, normal, and t
+            hit_record.hit_t = root;
+            hit_record.hit_point = ray_at(r, hit_record.hit_t);
+            hit_record.normal = (hit_record.hit_point - sphere.center) / sphere.radius;
+
+           return true;
         }
 
         vec3 ray_color(in Ray r) {
             Sphere sphere_1 = Sphere(vec3(0., 0., -1.), 0.5);
 
-            float hit_t = hit_sphere(sphere_1, r);
-             if (hit_t > 0.) {
-                vec3 hit_point = ray_at(r, hit_t);
-                vec3 normal = normalize(hit_point - sphere_1.center);
-                return (normal + 1.) * 0.5;
+            // hit record gets modified with hit details if there was a hit
+            HitRecord hit_record = HitRecord(vec3(0.), 0., vec3(0.));
+            bool was_hit = hit_sphere(sphere_1, r, 0.001, 100000., hit_record);
+            if (was_hit) {
+                return (hit_record.normal + 1.) * 0.5;
             }
 
             vec3 unit_direction = normalize(r.direction);
