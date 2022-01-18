@@ -98,20 +98,36 @@
             }
 
             // hit is within acceptable range: calculate hit point, normal, and t
-            hit_record.hit_t = root;
-            hit_record.hit_point = ray_at(r, hit_record.hit_t);
-            vec3 outward_normal = (hit_record.hit_point - sphere.center) / sphere.radius;
-            set_hit_record_front_face(hit_record, r, outward_normal);
-
+            vec3 new_hit_point = ray_at(r, root);
+            // only save new hit_point if it is in front of the previous hit point
+            if (new_hit_point.z > hit_record.hit_point.z) {
+                hit_record.hit_t = root;
+                hit_record.hit_point = ray_at(r, hit_record.hit_t);
+                vec3 outward_normal = (hit_record.hit_point - sphere.center) / sphere.radius;
+                set_hit_record_front_face(hit_record, r, outward_normal);
+            }
            return true;
+        }
+
+        bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
+            Sphere sphere_1 = Sphere(vec3(0., 0., -1.), 0.5);
+            Sphere sphere_2 = Sphere(vec3(0., -100.5, -1.), 100.);
+
+            bool hit = false;
+            hit = hit_sphere(sphere_1, r, t_min, t_max, hit_record) || hit;
+            hit = hit_sphere(sphere_2, r, t_min, t_max, hit_record) || hit;
+
+            return hit;
         }
 
         vec3 ray_color(in Ray r) {
             Sphere sphere_1 = Sphere(vec3(0., 0., -1.), 0.5);
+            float max_t = 10000000000.;
+            float min_t = 0.001;
 
             // hit record gets modified with hit details if there was a hit
-            HitRecord hit_record = HitRecord(vec3(0.), 0., vec3(0.), false);
-            bool was_hit = hit_sphere(sphere_1, r, 0.001, 100000., hit_record);
+            HitRecord hit_record = HitRecord(vec3(0., 0., -max_t), 0., vec3(0.), false);
+            bool was_hit = hit_world(r, min_t, max_t, hit_record);
             if (was_hit) {
                 return (hit_record.normal + 1.) * 0.5;
             }
