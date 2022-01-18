@@ -25,6 +25,12 @@ wasm-bindgen-test = "0.3"
 [dependencies.web-sys]
 version = "0.3.4"
 features = [
-  'Window',
   'Document',
+  'Element',
+  'HtmlCanvasElement',
+  'WebGlBuffer',
+  'WebGlRenderingContext',
+  'WebGlProgram',
+  'WebGlShader',
+  'Window',
 ]
