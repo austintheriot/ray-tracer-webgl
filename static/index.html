@@ -13,7 +13,6 @@
         canvas {
             width: 100%;
             max-width: 100vw;
-            image-rendering: pixelated;
             object-fit: contain;
         }
     </style>
@@ -163,7 +162,7 @@
         
         void main() {
             // these can be initialized as uniforms instead
-            int samples_per_pixel = 100;
+            int samples_per_pixel = 500;
             float aspect_ratio = u_width / u_height;
             float viewport_height = 2.0;
             float viewport_width = aspect_ratio * viewport_height;
