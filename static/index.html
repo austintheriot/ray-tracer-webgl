@@ -25,7 +25,10 @@
     <script id="vertex-shader" type="x-shader/x-vertex">#version 300 es
         in vec4 a_position;
 
+        out vec2 v_position;
+
         void main() {
+            v_position = a_position.xy;
             gl_Position = a_position;
         }
       </script>
@@ -34,9 +37,12 @@
         precision highp float;
 
         out vec4 o_color;
+
+        in vec2 v_position;
         
         void main() {
-            o_color = vec4(1.0, 0.0, 0.0, 1.0);
+            vec2 color = (v_position + 1.) * 0.5;
+            o_color = vec4(color, 0.25, 1.0);
           }
       </script>
 </body>
