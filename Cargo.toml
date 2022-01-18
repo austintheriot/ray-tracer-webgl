@@ -36,4 +36,5 @@ features = [
   'HtmlScriptElement',
   'WebGlVertexArrayObject',
   'WebGlUniformLocation',
+  'Performance'
 ]

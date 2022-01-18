@@ -36,27 +36,33 @@
         precision highp float;
 
         // PSEUDO-RANDOM NUMBER GENERATORS //////////////////////////////////////////////////////
-        #define M1 1597334677U     //1719413*929
-        #define M2 3812015801U     //140473*2467*11
-        #define M3 3299493293U     //467549*7057
+        // Hash functions by Nimitz:
+        // https://www.shadertoy.com/view/Xt3cDn
 
-        #define F0 (1.0/float(0xffffffffU))
+        uint base_hash(uvec2 p) {
+            p = 1103515245U*((p >> 1U)^(p.yx));
+            uint h32 = 1103515245U*((p.x)^(p.y>>3U));
+            return h32^(h32 >> 16);
+        }
 
-        #define hash(n) n*(n^(n>>15))
+        vec2 hash2(inout float seed) {
+            uint n = base_hash(floatBitsToUint(vec2(seed+=.1,seed+=.1)));
+            uvec2 rz = uvec2(n, n*48271U);
+            return vec2(rz.xy & uvec2(0x7fffffffU))/float(0x7fffffff);
+        }
 
-        #define coord1(p) (p*M1)
-        #define coord2(p) (p.x*M1^p.y*M2)
-        #define coord3(p) (p.x*M1^p.y*M2^p.z*M3)
+        vec3 hash3(inout float seed) {
+            uint n = base_hash(floatBitsToUint(vec2(seed+=.1,seed+=.1)));
+            uvec3 rz = uvec3(n, n*16807U, n*48271U);
+            return vec3(rz & uvec3(0x7fffffffU))/float(0x7fffffff);
+        }
 
-        float hash1(uint n){return float(hash(n))*F0;}
-        vec2 hash2(uint n){return vec2(hash(n)*uvec2(0x1U,0x3fffU))*F0;}
-        vec3 hash3(uint n){return vec3(hash(n)*uvec3(0x1U,0x1ffU,0x3ffffU))*F0;}
-        vec4 hash4(uint n){return vec4(hash(n)*uvec4(0x1U,0x7fU,0x3fffU,0x1fffffU))*F0;}
 
 
         // INPUTS / OUTPUTS //////////////////////////////////////////////////////
         uniform float u_width;
         uniform float u_height;
+        uniform float u_time;
         
         out vec4 o_color;
         
@@ -80,12 +86,15 @@
             bool front_face;
         };
 
-        // CONSTS ////////////////////////////////////////////////////////
+        // GLOBALS ////////////////////////////////////////////////////////
         const float PI = 3.141592653589793;
         const int MAX_DEPTH = 5;
         // max possible float
         const float MAX_T = 1e5; 
         const float MIN_T = 0.001;
+
+        float global_seed = 0.;
+
         
         // FUNCTIONS //////////////////////////////////////////////////////
         vec3 ray_at(in Ray r, float hit_t) {
@@ -96,8 +105,8 @@
             return pow(length(v), 2.);
         }
 
-        vec3 random_in_unit_sphere(in uint seed) {
-            vec3 random = hash3(seed);
+        vec3 random_in_unit_sphere() {
+            vec3 random = (hash3(global_seed) * 2.) - 1.;
             float theta = random.x * 2.0 * PI;
             float phi = acos(2.0 * random.y - 1.0);
             float r = pow(random.z, 1. / 3.);
@@ -111,8 +120,8 @@
             return vec3(x, y, z);
         }
 
-        vec3 random_unit_vec(in uint seed) {
-           return normalize(random_in_unit_sphere(seed));
+        vec3 random_unit_vec() {
+           return normalize(random_in_unit_sphere());
         }
 
         // records whether a hit happened to the front or back face of an object
@@ -187,8 +196,8 @@
                 // hit record gets modified with hit details if there was a hit
                 HitRecord hit_record = HitRecord(vec3(0., 0., -MAX_T), 0., vec3(0.), false);
                 if (hit_world(r, MIN_T, MAX_T, hit_record)) {
-                    uint seed = floatBitsToUint(r.direction.x * r.direction.y * float(i) * hit_record.normal.x * hit_record.normal.y);
-                    vec3 target = hit_record.hit_point + hit_record.normal + random_unit_vec(seed);
+                    vec3 random_direction = random_unit_vec();
+                    vec3 target = hit_record.hit_point + hit_record.normal + random_direction;
 
                     // color diminishes on reflection
                     color *= 0.5;
@@ -210,7 +219,7 @@
         
         void main() {
             // @todo: these can be initialized as uniforms instead
-            int samples_per_pixel = 500;
+            int samples_per_pixel = 100;
             float aspect_ratio = u_width / u_height;
             float viewport_height = 2.0;
             float viewport_width = aspect_ratio * viewport_height;
@@ -219,6 +228,8 @@
             vec3 viewport_horizontal_vec = vec3(viewport_width, 0., 0.);
             vec3 viewport_vertical_vec = vec3(0., viewport_height, 0.);
             vec3 lower_left_corner = camera_origin - viewport_horizontal_vec / 2. - viewport_vertical_vec / 2. - vec3(0., 0., focal_length);
+            // this seed initialization is by reinder https://www.shadertoy.com/view/llVcDz
+            global_seed = float(base_hash(floatBitsToUint(v_position))) / float(0xffffffffU) + u_time;
 
             // get current position on viewport, mapped from -1->1 to 0->1
             // (i.e. percentage of width, percentage of height)
@@ -227,9 +238,9 @@
             // accumulate color per pixel
             vec3 color = vec3(0.);
             for (int i = 0; i < samples_per_pixel; i++) {
-                uint random_seed = floatBitsToUint(uv.x * uv.y * 1000. * float(i));
-                vec2 random = hash2(random_seed);
-                vec2 random_within_pixel = random / vec2(u_width, u_height);
+                vec2 random = hash2(global_seed);
+                vec2 random_from_0_to_1 = (random * 0.5) + 1.0;
+                vec2 random_within_pixel = random_from_0_to_1 / vec2(u_width, u_height);
 
                 // uv +/- the value of 1 pixel
                 vec2 randomized_uv = uv + random_within_pixel;

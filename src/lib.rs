@@ -113,6 +113,7 @@ pub fn main() -> Result<(), JsValue> {
     let vertex_attribute_position = gl.get_attrib_location(&program, "a_position") as u32;
     let width_uniform_location = gl.get_uniform_location(&program, "u_width");
     let height_uniform_location = gl.get_uniform_location(&program, "u_height");
+    let time_uniform_location = gl.get_uniform_location(&program, "u_time");
 
     // SET VERTEX BUFFER
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
@@ -136,6 +137,10 @@ pub fn main() -> Result<(), JsValue> {
     // SET UNIFORMS
     gl.uniform1f(width_uniform_location.as_ref(), WIDTH as f32);
     gl.uniform1f(height_uniform_location.as_ref(), HEIGHT as f32);
+    gl.uniform1f(
+        time_uniform_location.as_ref(),
+        window.performance().unwrap().now() as f32,
+    );
 
     // RENDER
     gl.clear_color(0.0, 0.0, 0.0, 1.0);
