@@ -57,16 +57,20 @@
             return r.origin + r.direction * hit_t;
         }
 
+        float length_squared(in vec3 v) {
+            return pow(length(v), 2.);
+        }
+
         float hit_sphere(in Sphere sphere, in Ray r) {
             vec3 oc = r.origin - sphere.center;
-            float a = dot(r.direction, r.direction);
-            float b = 2.0 * dot(oc, r.direction);
-            float c = dot(oc, oc) - sphere.radius * sphere.radius;
-            float discriminant = b * b - 4. * a * c;
+            float a = length_squared(r.direction);
+            float half_b = dot(oc, r.direction);
+            float c = length_squared(oc) - pow(sphere.radius, 2.);
+            float discriminant = pow(half_b, 2.) - a * c;
             if (discriminant < 0.) {
                 return -1.0;
             } else {
-                return (-b - sqrt(discriminant)) / (2.0 * a);
+                return (-half_b - sqrt(discriminant) ) / a;
             }
         }
 
