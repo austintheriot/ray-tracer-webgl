@@ -34,7 +34,6 @@ features = [
   'WebGlShader',
   'Window',
   'HtmlScriptElement',
-  'WebGlVertexArrayObject',
   'WebGlUniformLocation',
   'Performance'
 ]

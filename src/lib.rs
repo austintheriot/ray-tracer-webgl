@@ -4,13 +4,15 @@ extern crate console_error_panic_hook;
 mod math;
 mod vec3;
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use vec3::{Point, Vec3};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlScriptElement, WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
-pub const WIDTH: u32 = 1600;
-pub const HEIGHT: u32 = 900;
+pub const WIDTH: u32 = 400;
+pub const HEIGHT: u32 = 225;
 pub const BYTES_PER_PIXEL: u32 = 4;
 pub const ASPECT_RATIO: f64 = (WIDTH as f64) / (HEIGHT as f64);
 pub const SAMPLES_PER_PIXEL: u32 = 100;
@@ -29,6 +31,7 @@ pub const LOWER_LEFT_CORNER: Point = Vec3(
 pub const SIMPLE_QUAD_VERTICES: [f32; 12] = [
     -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
 ];
+static mut SHOULD_RENDER: bool = true;
 
 pub fn compile_shader(
     gl: &WebGl2RenderingContext,
@@ -80,6 +83,22 @@ pub fn link_program(
     }
 }
 
+fn window() -> web_sys::Window {
+    web_sys::window().expect("no global `window` exists")
+}
+
+fn document() -> web_sys::Document {
+    window()
+        .document()
+        .expect("should have a document on window")
+}
+
+fn request_animation_frame(f: &Closure<dyn FnMut()>) {
+    window()
+        .request_animation_frame(f.as_ref().unchecked_ref())
+        .expect("should register `requestAnimationFrame` OK");
+}
+
 /// Entry function cannot be async, so spawns a local Future for running the real main function
 #[wasm_bindgen]
 pub fn main() -> Result<(), JsValue> {
@@ -88,8 +107,8 @@ pub fn main() -> Result<(), JsValue> {
     wasm_logger::init(wasm_logger::Config::default());
 
     // GET ELEMENTS
-    let window = web_sys::window().unwrap();
-    let document = window.document().unwrap();
+    let window = window();
+    let document = document();
     let canvas = document
         .query_selector("canvas")?
         .unwrap()
@@ -122,10 +141,6 @@ pub fn main() -> Result<(), JsValue> {
     };
     let program = link_program(&gl, &vertex_shader, &fragment_shader)?;
     gl.use_program(Some(&program));
-
-    // SETUP VAO
-    let vao = gl.create_vertex_array().ok_or("Couldn't create vao")?;
-    gl.bind_vertex_array(Some(&vao));
 
     // GET LOCATIONS
     let vertex_attribute_position = gl.get_attrib_location(&program, "a_position") as u32;
@@ -164,53 +179,71 @@ pub fn main() -> Result<(), JsValue> {
         0,
     );
 
-    // SET UNIFORMS
-    gl.uniform1f(width_u_location.as_ref(), WIDTH as f32);
-    gl.uniform1f(height_u_location.as_ref(), HEIGHT as f32);
-    gl.uniform1i(max_depth_u_location.as_ref(), MAX_DEPTH as i32);
-    gl.uniform1f(
-        time_u_location.as_ref(),
-        window.performance().unwrap().now() as f32,
-    );
-    gl.uniform1i(
-        samples_per_pixel_u_location.as_ref(),
-        SAMPLES_PER_PIXEL as i32,
-    );
-    // float aspect_ratio = u_width / u_height;
-    gl.uniform1f(aspect_ratio_u_location.as_ref(), ASPECT_RATIO as f32);
-    // float viewport_height = 2.0;
-    gl.uniform1f(viewport_height_u_location.as_ref(), VIEWPORT_HEIGHT as f32);
-    // float focal_length = 1.0;
-    gl.uniform1f(focal_length_u_location.as_ref(), FOCAL_LENGTH as f32);
-    // vec3 camera_origin = vec3(0.);
-    gl.uniform3fv_with_f32_array(camera_origin_u_location.as_ref(), &CAMERA_ORIGIN.to_array());
-    // float viewport_width = aspect_ratio * viewport_height;
-    gl.uniform1f(viewport_width_u_location.as_ref(), VIEWPORT_WIDTH as f32);
-    // vec3 viewport_horizontal_vec = vec3(viewport_width, 0., 0.);
-    gl.uniform3fv_with_f32_array(
-        viewport_horizontal_vec_u_location.as_ref(),
-        &VIEWPORT_HORIZONTAL_VEC.to_array(),
-    );
-    // vec3 viewport_vertical_vec = vec3(0., viewport_height, 0.);
-    gl.uniform3fv_with_f32_array(
-        viewport_vertical_vec_u_location.as_ref(),
-        &VIEWPORT_VERTICAL_VEC.to_array(),
-    );
-    // vec3 lower_left_corner = camera_origin - viewport_horizontal_vec / 2. - viewport_vertical_vec / 2. - vec3(0., 0., focal_length);
-    gl.uniform3fv_with_f32_array(
-        lower_left_corner_u_location.as_ref(),
-        &LOWER_LEFT_CORNER.to_array(),
-    );
+    // RENDER LOOP
+    let f = Rc::new(RefCell::new(None));
+    let g = f.clone();
+    *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
+        if unsafe { SHOULD_RENDER } {
+            unsafe {
+                // set to false to only render on updates
+                SHOULD_RENDER = true;
+            }
 
-    // RENDER
-    gl.clear_color(0.0, 0.0, 0.0, 1.0);
-    gl.viewport(0, 0, WIDTH as i32, HEIGHT as i32);
-    gl.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
-    gl.draw_arrays(
-        WebGl2RenderingContext::TRIANGLES,
-        0,
-        (SIMPLE_QUAD_VERTICES.len() / 2) as i32,
-    );
+            // SET UNIFORMS
+            gl.uniform1f(width_u_location.as_ref(), WIDTH as f32);
+            gl.uniform1f(height_u_location.as_ref(), HEIGHT as f32);
+            gl.uniform1i(max_depth_u_location.as_ref(), MAX_DEPTH as i32);
+            gl.uniform1f(
+                time_u_location.as_ref(),
+                window.performance().unwrap().now() as f32,
+            );
+            gl.uniform1i(
+                samples_per_pixel_u_location.as_ref(),
+                SAMPLES_PER_PIXEL as i32,
+            );
+            // float aspect_ratio = u_width / u_height;
+            gl.uniform1f(aspect_ratio_u_location.as_ref(), ASPECT_RATIO as f32);
+            // float viewport_height = 2.0;
+            gl.uniform1f(viewport_height_u_location.as_ref(), VIEWPORT_HEIGHT as f32);
+            // float focal_length = 1.0;
+            gl.uniform1f(focal_length_u_location.as_ref(), FOCAL_LENGTH as f32);
+            // vec3 camera_origin = vec3(0.);
+            gl.uniform3fv_with_f32_array(
+                camera_origin_u_location.as_ref(),
+                &CAMERA_ORIGIN.to_array(),
+            );
+            // float viewport_width = aspect_ratio * viewport_height;
+            gl.uniform1f(viewport_width_u_location.as_ref(), VIEWPORT_WIDTH as f32);
+            // vec3 viewport_horizontal_vec = vec3(viewport_width, 0., 0.);
+            gl.uniform3fv_with_f32_array(
+                viewport_horizontal_vec_u_location.as_ref(),
+                &VIEWPORT_HORIZONTAL_VEC.to_array(),
+            );
+            // vec3 viewport_vertical_vec = vec3(0., viewport_height, 0.);
+            gl.uniform3fv_with_f32_array(
+                viewport_vertical_vec_u_location.as_ref(),
+                &VIEWPORT_VERTICAL_VEC.to_array(),
+            );
+            // vec3 lower_left_corner = camera_origin - viewport_horizontal_vec / 2. - viewport_vertical_vec / 2. - vec3(0., 0., focal_length);
+            gl.uniform3fv_with_f32_array(
+                lower_left_corner_u_location.as_ref(),
+                &LOWER_LEFT_CORNER.to_array(),
+            );
+
+            // RENDER
+            gl.clear_color(0.0, 0.0, 0.0, 1.0);
+            gl.viewport(0, 0, WIDTH as i32, HEIGHT as i32);
+            gl.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
+            gl.draw_arrays(
+                WebGl2RenderingContext::TRIANGLES,
+                0,
+                (SIMPLE_QUAD_VERTICES.len() / 2) as i32,
+            );
+        }
+        request_animation_frame(f.borrow().as_ref().unwrap());
+    }) as Box<dyn FnMut()>));
+
+    request_animation_frame(g.borrow().as_ref().unwrap());
 
     Ok(())
 }
