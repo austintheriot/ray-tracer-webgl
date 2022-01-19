@@ -1,5 +1,10 @@
 #![feature(format_args_capture)]
 extern crate console_error_panic_hook;
+
+mod math;
+mod vec3;
+
+use vec3::{Point, Vec3};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlScriptElement, WebGl2RenderingContext, WebGlProgram, WebGlShader};
@@ -10,6 +15,17 @@ pub const BYTES_PER_PIXEL: u32 = 4;
 pub const ASPECT_RATIO: f64 = (WIDTH as f64) / (HEIGHT as f64);
 pub const SAMPLES_PER_PIXEL: u32 = 100;
 pub const MAX_DEPTH: u32 = 50;
+pub const VIEWPORT_HEIGHT: f64 = 2.0;
+pub const VIEWPORT_WIDTH: f64 = ASPECT_RATIO * VIEWPORT_HEIGHT;
+pub const FOCAL_LENGTH: f64 = 1.0;
+pub const CAMERA_ORIGIN: Point = Point(0., 0., 0.);
+pub const VIEWPORT_HORIZONTAL_VEC: Vec3 = Vec3(VIEWPORT_WIDTH, 0., 0.);
+pub const VIEWPORT_VERTICAL_VEC: Vec3 = Vec3(0., VIEWPORT_HEIGHT, 0.);
+pub const LOWER_LEFT_CORNER: Point = Vec3(
+    CAMERA_ORIGIN.0 - VIEWPORT_HORIZONTAL_VEC.0 / 2.,
+    CAMERA_ORIGIN.1 - VIEWPORT_VERTICAL_VEC.1 / 2.,
+    CAMERA_ORIGIN.2 - FOCAL_LENGTH,
+);
 
 pub const VERTICES: [f32; 12] = [
     -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
@@ -155,19 +171,35 @@ pub fn main() -> Result<(), JsValue> {
         time_u_location.as_ref(),
         window.performance().unwrap().now() as f32,
     );
-    // int samples_per_pixel = 100;
-    gl.uniform1f(
+    gl.uniform1i(
         samples_per_pixel_u_location.as_ref(),
-        SAMPLES_PER_PIXEL as f32,
+        SAMPLES_PER_PIXEL as i32,
     );
     // float aspect_ratio = u_width / u_height;
+    gl.uniform1f(aspect_ratio_u_location.as_ref(), ASPECT_RATIO as f32);
     // float viewport_height = 2.0;
+    gl.uniform1f(viewport_height_u_location.as_ref(), VIEWPORT_HEIGHT as f32);
     // float focal_length = 1.0;
+    gl.uniform1f(focal_length_u_location.as_ref(), FOCAL_LENGTH as f32);
     // vec3 camera_origin = vec3(0.);
+    gl.uniform3fv_with_f32_array(camera_origin_u_location.as_ref(), &CAMERA_ORIGIN.to_array());
     // float viewport_width = aspect_ratio * viewport_height;
+    gl.uniform1f(viewport_width_u_location.as_ref(), VIEWPORT_WIDTH as f32);
     // vec3 viewport_horizontal_vec = vec3(viewport_width, 0., 0.);
+    gl.uniform3fv_with_f32_array(
+        viewport_horizontal_vec_u_location.as_ref(),
+        &VIEWPORT_HORIZONTAL_VEC.to_array(),
+    );
     // vec3 viewport_vertical_vec = vec3(0., viewport_height, 0.);
+    gl.uniform3fv_with_f32_array(
+        viewport_vertical_vec_u_location.as_ref(),
+        &VIEWPORT_VERTICAL_VEC.to_array(),
+    );
     // vec3 lower_left_corner = camera_origin - viewport_horizontal_vec / 2. - viewport_vertical_vec / 2. - vec3(0., 0., focal_length);
+    gl.uniform3fv_with_f32_array(
+        lower_left_corner_u_location.as_ref(),
+        &LOWER_LEFT_CORNER.to_array(),
+    );
 
     // RENDER
     gl.clear_color(0.0, 0.0, 0.0, 1.0);
