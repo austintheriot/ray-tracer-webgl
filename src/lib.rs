@@ -14,7 +14,7 @@ pub const HEIGHT: u32 = 900;
 pub const BYTES_PER_PIXEL: u32 = 4;
 pub const ASPECT_RATIO: f64 = (WIDTH as f64) / (HEIGHT as f64);
 pub const SAMPLES_PER_PIXEL: u32 = 100;
-pub const MAX_DEPTH: u32 = 50;
+pub const MAX_DEPTH: u32 = 5;
 pub const VIEWPORT_HEIGHT: f64 = 2.0;
 pub const VIEWPORT_WIDTH: f64 = ASPECT_RATIO * VIEWPORT_HEIGHT;
 pub const FOCAL_LENGTH: f64 = 1.0;
@@ -26,8 +26,7 @@ pub const LOWER_LEFT_CORNER: Point = Vec3(
     CAMERA_ORIGIN.1 - VIEWPORT_VERTICAL_VEC.1 / 2.,
     CAMERA_ORIGIN.2 - FOCAL_LENGTH,
 );
-
-pub const VERTICES: [f32; 12] = [
+pub const SIMPLE_QUAD_VERTICES: [f32; 12] = [
     -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
 ];
 
@@ -144,11 +143,12 @@ pub fn main() -> Result<(), JsValue> {
     let viewport_vertical_vec_u_location =
         gl.get_uniform_location(&program, "u_viewport_vertical_vec");
     let lower_left_corner_u_location = gl.get_uniform_location(&program, "u_lower_left_corner");
+    let max_depth_u_location = gl.get_uniform_location(&program, "u_max_depth");
 
     // SET VERTEX BUFFER
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
     gl.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&buffer));
-    let vertex_array = unsafe { js_sys::Float32Array::view(&VERTICES) };
+    let vertex_array = unsafe { js_sys::Float32Array::view(&SIMPLE_QUAD_VERTICES) };
     gl.buffer_data_with_array_buffer_view(
         WebGl2RenderingContext::ARRAY_BUFFER,
         &vertex_array,
@@ -167,6 +167,7 @@ pub fn main() -> Result<(), JsValue> {
     // SET UNIFORMS
     gl.uniform1f(width_u_location.as_ref(), WIDTH as f32);
     gl.uniform1f(height_u_location.as_ref(), HEIGHT as f32);
+    gl.uniform1i(max_depth_u_location.as_ref(), MAX_DEPTH as i32);
     gl.uniform1f(
         time_u_location.as_ref(),
         window.performance().unwrap().now() as f32,
@@ -208,7 +209,7 @@ pub fn main() -> Result<(), JsValue> {
     gl.draw_arrays(
         WebGl2RenderingContext::TRIANGLES,
         0,
-        (VERTICES.len() / 2) as i32,
+        (SIMPLE_QUAD_VERTICES.len() / 2) as i32,
     );
 
     Ok(())
