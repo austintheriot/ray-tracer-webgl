@@ -20,8 +20,8 @@ pub const HEIGHT: u32 = 720;
 pub const BYTES_PER_PIXEL: u32 = 4;
 pub const PIXEL_ARRAY_LENGTH: usize = (WIDTH * HEIGHT * BYTES_PER_PIXEL) as usize;
 pub const ASPECT_RATIO: f64 = (WIDTH as f64) / (HEIGHT as f64);
-pub const SAMPLES_PER_PIXEL: u32 = 3;
-pub const MAX_DEPTH: u32 = 5;
+pub const SAMPLES_PER_PIXEL: u32 = 1;
+pub const MAX_DEPTH: u32 = 10;
 pub const VIEWPORT_HEIGHT: f64 = 2.0;
 pub const VIEWPORT_WIDTH: f64 = ASPECT_RATIO * VIEWPORT_HEIGHT;
 pub const FOCAL_LENGTH: f64 = 1.0;
@@ -48,9 +48,9 @@ static mut EVEN_ODD_COUNT: u32 = 0;
 /// Used for averaging previous frames together
 static mut RENDER_COUNT: f32 = 0.;
 /// The weight of the last frame compared to the each frame before.
-pub const LAST_FRAME_WEIGHT: f32 = 2.;
+pub const LAST_FRAME_WEIGHT: f32 = 1.;
 /// Limiting the counted renders allows creating a sliding average of frames
-static mut MAX_RENDER_COUNT: f32 = 20.;
+static mut MAX_RENDER_COUNT: f32 = 10000.;
 static mut PREV_NOW: f64 = 0.;
 static mut PREV_FPS_UPDATE_TIME: f64 = 0.;
 static mut PREV_FPS: [f64; 50] = [0.; 50];

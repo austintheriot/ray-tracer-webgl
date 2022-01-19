@@ -101,6 +101,7 @@
 
         struct Material {
             // 0 = Diffuse
+            // 1 = Metal
             int type;
         };
 
@@ -183,37 +184,16 @@
             vec3 outward_normal = (hit_record.hit_point - sphere.center) / sphere.radius;
             set_hit_record_front_face(hit_record, r, outward_normal);
             return true;
-        }
+    }
 
         bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
-            float spin_radius = 0.6;
-            float divisor = 3.;
-            float xy_speed_sensitivity = 0.001;
-            float z_speed_sensitivity = 0.0013;
-
             // make list of hittable geometry
             Sphere sphere_list[] = Sphere[5](
                 Sphere(vec3(0., 0., -1.), 0.5, Material(0)),
-                Sphere(
-                    vec3(spin_radius * cos(u_time * xy_speed_sensitivity + PI / divisor), 0.25 * cos(u_time * z_speed_sensitivity + PI / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + PI / divisor)), 
-                    0.1,
-                    Material(0)
-                ),
-                Sphere(
-                    vec3(spin_radius * cos(u_time * xy_speed_sensitivity + (2. * PI) / divisor), 0.25 * cos(u_time * z_speed_sensitivity + (2. * PI) / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + (2. * PI) / divisor)),
-                    0.1,
-                    Material(0)
-                ),
-                Sphere(
-                    vec3(spin_radius * cos(u_time * xy_speed_sensitivity + (3. * PI) / divisor), 0.25 * cos(u_time * z_speed_sensitivity + (3. * PI) / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + (3. * PI) / divisor)),
-                    0.1,
-                    Material(0)
-                ),
-                Sphere(
-                    vec3(0., -100.5, -1.), 
-                    100.,
-                    Material(0)
-                )
+                Sphere(vec3(-1., 0., -1.), 0.5, Material(1)),
+                Sphere(vec3(-0.45, -0.4, -0.7), 0.1, Material(1)),
+                Sphere(vec3(1., 0., -1.), 0.5, Material(1)),
+                Sphere(vec3(0., -100.5, -1.),  100., Material(0))
             );
             
             // test whether any geometry was hit. If it was, the hit_record will be updated with
@@ -239,9 +219,13 @@
             return (v.x < low_extreme) && (v.y < low_extreme) && (v.z < low_extreme);
         }
 
+        vec3 reflect(in vec3 v, in vec3 normal) {
+            return v - 2. * dot(v, normal) * normal;
+        }
+
         // scatters a ray depending on what material was intersected with
         bool scatter(in Ray r, in HitRecord hit_record, out vec3 attenuation, out Ray scattered_ray) {
-            // diffuse material (lambertian reflection)
+            // 0 = diffuse material (lambertian reflection)
             if (hit_record.material.type == 0) {
                 // color attenuation on reflection
                 attenuation = vec3(0.5, 0.5, 0.5);
@@ -254,6 +238,18 @@
                     scatter_direction = hit_record.normal;
                 }
                 scattered_ray = Ray(hit_record.hit_point, scatter_direction);
+
+                return true;
+            } 
+
+            // 1 = metal material
+            if (hit_record.material.type == 1) {
+                // color attenuation on reflection
+                attenuation = vec3(1., 1., 1.);
+
+                // shoot ray off in random direction again
+                vec3 reflected_direction = reflect(r.direction, hit_record.normal);
+                scattered_ray = Ray(hit_record.hit_point, reflected_direction);
 
                 return true;
             } 
