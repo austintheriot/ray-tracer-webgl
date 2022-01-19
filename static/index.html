@@ -103,6 +103,8 @@
             // 0 = Diffuse
             // 1 = Metal
             int type;
+            vec3 albedo; // or "reflectance"
+            float fuzz;
         };
 
         struct Sphere {
@@ -187,14 +189,13 @@
     }
 
         bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
-            // make list of hittable geometry
-            Sphere sphere_list[] = Sphere[5](
-                Sphere(vec3(0., 0., -1.), 0.5, Material(0)),
-                Sphere(vec3(-1., 0., -1.), 0.5, Material(1)),
-                Sphere(vec3(-0.45, -0.4, -0.7), 0.1, Material(1)),
-                Sphere(vec3(1., 0., -1.), 0.5, Material(1)),
-                Sphere(vec3(0., -100.5, -1.),  100., Material(0))
-            );
+            // compose the scene (hardcoded for now)
+            Sphere ground =  Sphere(vec3(0., -100.5, -1.),  100., Material(0, vec3(0.75, 0.6, 0.5), 0.));
+            Sphere center = Sphere(vec3(0., 0., -1.), 0.5, Material(0, vec3(0.3, 0.3, 0.4), 0.));
+            Sphere left = Sphere(vec3(-1., 0., -1.), 0.5, Material(1, vec3(1., 1., 1.), 0.));
+            Sphere left_small = Sphere(vec3(-0.45, -0.4, -0.7), 0.1, Material(1, vec3(1., 1., 1.), 0.));
+            Sphere right = Sphere(vec3(1., 0., -1.), 0.5, Material(1, vec3(1., 1., 1.), 0.5));
+            Sphere sphere_list[] = Sphere[5](center, left, left_small, right, ground);
             
             // test whether any geometry was hit. If it was, the hit_record will be updated with
             // the new hit data if the new hit was closer to the camera than the previous hit
@@ -228,7 +229,7 @@
             // 0 = diffuse material (lambertian reflection)
             if (hit_record.material.type == 0) {
                 // color attenuation on reflection
-                attenuation = vec3(0.5, 0.5, 0.5);
+                attenuation = hit_record.material.albedo;
 
                 // shoot ray off in random direction again
                 vec3 scatter_direction = hit_record.normal + random_unit_vec();
@@ -242,16 +243,22 @@
                 return true;
             } 
 
-            // 1 = metal material
+            // 1 = metal
             if (hit_record.material.type == 1) {
                 // color attenuation on reflection
-                attenuation = vec3(1., 1., 1.);
+                attenuation = hit_record.material.albedo;
 
-                // shoot ray off in random direction again
+                // reflect ray off the surface
                 vec3 reflected_direction = reflect(r.direction, hit_record.normal);
-                scattered_ray = Ray(hit_record.hit_point, reflected_direction);
+                // add in "fuzz" (optional)
+                vec3 fuzz = random_unit_vec() * hit_record.material.fuzz; 
+                vec3 fuzzed_direction = reflected_direction + fuzz;
+                scattered_ray = Ray(hit_record.hit_point, fuzzed_direction);
 
-                return true;
+                // count any rays that are reflected below the surface as  "absorbed"
+                bool reflected_above_surface = dot(hit_record.normal, fuzzed_direction) > 0.;
+
+                return reflected_above_surface;
             } 
 
             // unrecognized material integer (likely an error)
