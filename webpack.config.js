@@ -1,6 +1,7 @@
 const path = require('path');
 const WasmPackPlugin = require('@wasm-tool/wasm-pack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 
 const distPath = path.resolve(__dirname, "dist");
 module.exports = (env, argv) => {
@@ -9,16 +10,12 @@ module.exports = (env, argv) => {
       contentBase: distPath,
       compress: argv.mode === 'production',
       port: 8000,
-      headers: {
-        "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Embedder-Policy": "require-corp"
-      }
     },
     entry: './index.js',
     output: {
       path: distPath,
       filename: "main.js",
-      webassemblyModuleFilename: "main.wasm"
+      webassemblyModuleFilename: "main.wasm",
     },
     module: {
       rules: [
@@ -40,7 +37,8 @@ module.exports = (env, argv) => {
       }),
       new WasmPackPlugin({
         crateDirectory: ".",
-      })
+      }),
+      new CleanWebpackPlugin(),
     ],
     watch: argv.mode !== 'production'
   };
