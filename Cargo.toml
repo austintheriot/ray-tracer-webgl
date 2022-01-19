@@ -35,5 +35,7 @@ features = [
   'Window',
   'HtmlScriptElement',
   'WebGlUniformLocation',
-  'Performance'
+  'Performance',
+  'WebGlFramebuffer',
+  'WebGlTexture',
 ]

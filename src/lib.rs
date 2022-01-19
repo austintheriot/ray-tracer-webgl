@@ -4,18 +4,23 @@ extern crate console_error_panic_hook;
 mod math;
 mod vec3;
 
+use log::info;
 use std::cell::RefCell;
 use std::rc::Rc;
 use vec3::{Point, Vec3};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{HtmlScriptElement, WebGl2RenderingContext, WebGlProgram, WebGlShader};
+use web_sys::{
+    HtmlScriptElement, WebGl2RenderingContext, WebGlFramebuffer, WebGlProgram, WebGlShader,
+    WebGlTexture,
+};
 
-pub const WIDTH: u32 = 1600;
-pub const HEIGHT: u32 = 900;
+pub const WIDTH: u32 = 160;
+pub const HEIGHT: u32 = 90;
 pub const BYTES_PER_PIXEL: u32 = 4;
+pub const PIXEL_ARRAY_LENGTH: usize = (WIDTH * HEIGHT * BYTES_PER_PIXEL) as usize;
 pub const ASPECT_RATIO: f64 = (WIDTH as f64) / (HEIGHT as f64);
-pub const SAMPLES_PER_PIXEL: u32 = 100;
+pub const SAMPLES_PER_PIXEL: u32 = 5;
 pub const MAX_DEPTH: u32 = 5;
 pub const VIEWPORT_HEIGHT: f64 = 2.0;
 pub const VIEWPORT_WIDTH: f64 = ASPECT_RATIO * VIEWPORT_HEIGHT;
@@ -32,8 +37,10 @@ pub const SIMPLE_QUAD_VERTICES: [f32; 12] = [
     -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
 ];
 static mut SHOULD_RENDER: bool = true;
+static mut EVEN_ODD_COUNT: u32 = 0;
+static mut RENDER_COUNT: f32 = 0.;
 
-pub fn compile_shader(
+fn compile_shader(
     gl: &WebGl2RenderingContext,
     shader_type: u32,
     source: &str,
@@ -57,7 +64,7 @@ pub fn compile_shader(
     }
 }
 
-pub fn link_program(
+fn link_program(
     gl: &WebGl2RenderingContext,
     vert_shader: &WebGlShader,
     frag_shader: &WebGlShader,
@@ -83,6 +90,65 @@ pub fn link_program(
     }
 }
 
+fn create_texture(gl: &WebGl2RenderingContext) -> WebGlTexture {
+    let texture = gl.create_texture();
+    gl.bind_texture(WebGl2RenderingContext::TEXTURE_2D, texture.as_ref());
+
+    // Set the parameters so we don't need mips, we're not filtering, and we don't repeat
+    gl.tex_parameteri(
+        WebGl2RenderingContext::TEXTURE_2D,
+        WebGl2RenderingContext::TEXTURE_WRAP_S,
+        WebGl2RenderingContext::CLAMP_TO_EDGE as i32,
+    );
+    gl.tex_parameteri(
+        WebGl2RenderingContext::TEXTURE_2D,
+        WebGl2RenderingContext::TEXTURE_WRAP_T,
+        WebGl2RenderingContext::CLAMP_TO_EDGE as i32,
+    );
+    gl.tex_parameteri(
+        WebGl2RenderingContext::TEXTURE_2D,
+        WebGl2RenderingContext::TEXTURE_MIN_FILTER,
+        WebGl2RenderingContext::NEAREST as i32,
+    );
+    gl.tex_parameteri(
+        WebGl2RenderingContext::TEXTURE_2D,
+        WebGl2RenderingContext::TEXTURE_MAG_FILTER,
+        WebGl2RenderingContext::NEAREST as i32,
+    );
+
+    // load empty texture into gpu -- this will get rendered into later
+    gl.tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and_opt_u8_array(
+        WebGl2RenderingContext::TEXTURE_2D,
+        0,
+        WebGl2RenderingContext::RGBA as i32,
+        WIDTH as i32,
+        HEIGHT as i32,
+        0,
+        WebGl2RenderingContext::RGBA,
+        WebGl2RenderingContext::UNSIGNED_BYTE,
+        None,
+    )
+    .unwrap();
+
+    texture.unwrap()
+}
+
+fn create_framebuffer(gl: &WebGl2RenderingContext, texture: &WebGlTexture) -> WebGlFramebuffer {
+    let framebuffer_object = gl.create_framebuffer();
+    gl.bind_framebuffer(
+        WebGl2RenderingContext::FRAMEBUFFER,
+        framebuffer_object.as_ref(),
+    );
+    gl.framebuffer_texture_2d(
+        WebGl2RenderingContext::FRAMEBUFFER,
+        WebGl2RenderingContext::COLOR_ATTACHMENT0,
+        WebGl2RenderingContext::TEXTURE_2D,
+        Some(&texture),
+        0,
+    );
+    framebuffer_object.unwrap()
+}
+
 fn window() -> web_sys::Window {
     web_sys::window().expect("no global `window` exists")
 }
@@ -97,6 +163,17 @@ fn request_animation_frame(f: &Closure<dyn FnMut()>) {
     window()
         .request_animation_frame(f.as_ref().unchecked_ref())
         .expect("should register `requestAnimationFrame` OK");
+}
+
+fn draw(gl: &WebGl2RenderingContext) {
+    gl.clear_color(0.0, 0.0, 0.0, 1.0);
+    gl.viewport(0, 0, WIDTH as i32, HEIGHT as i32);
+    gl.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
+    gl.draw_arrays(
+        WebGl2RenderingContext::TRIANGLES,
+        0,
+        (SIMPLE_QUAD_VERTICES.len() / 2) as i32,
+    );
 }
 
 /// Entry function cannot be async, so spawns a local Future for running the real main function
@@ -144,6 +221,7 @@ pub fn main() -> Result<(), JsValue> {
 
     // GET LOCATIONS
     let vertex_attribute_position = gl.get_attrib_location(&program, "a_position") as u32;
+    let texture_u_location = gl.get_uniform_location(&program, "u_texture");
     let width_u_location = gl.get_uniform_location(&program, "u_width");
     let height_u_location = gl.get_uniform_location(&program, "u_height");
     let time_u_location = gl.get_uniform_location(&program, "u_time");
@@ -159,6 +237,7 @@ pub fn main() -> Result<(), JsValue> {
         gl.get_uniform_location(&program, "u_viewport_vertical_vec");
     let lower_left_corner_u_location = gl.get_uniform_location(&program, "u_lower_left_corner");
     let max_depth_u_location = gl.get_uniform_location(&program, "u_max_depth");
+    let render_count_u_location = gl.get_uniform_location(&program, "u_render_count");
 
     // SET VERTEX BUFFER
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
@@ -179,6 +258,15 @@ pub fn main() -> Result<(), JsValue> {
         0,
     );
 
+    // CREATE TEXTURE
+    let textures = [create_texture(&gl), create_texture(&gl)];
+
+    // CREATE FRAMEBUFFER & ATTACH TEXTURE
+    let framebuffer_objects = [
+        create_framebuffer(&gl, &textures[0]),
+        create_framebuffer(&gl, &textures[1]),
+    ];
+
     // RENDER LOOP
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
@@ -186,10 +274,14 @@ pub fn main() -> Result<(), JsValue> {
         if unsafe { SHOULD_RENDER } {
             unsafe {
                 // set to false to only render on updates
-                SHOULD_RENDER = false;
+                SHOULD_RENDER = true;
+                EVEN_ODD_COUNT += 1;
+                RENDER_COUNT += 1.;
             }
 
             // SET UNIFORMS
+            // tell the fragment shader to get the u_image texture from texture unit 0 (default)
+            gl.uniform1i(texture_u_location.as_ref(), 0);
             gl.uniform1f(width_u_location.as_ref(), WIDTH as f32);
             gl.uniform1f(height_u_location.as_ref(), HEIGHT as f32);
             gl.uniform1i(max_depth_u_location.as_ref(), MAX_DEPTH as i32);
@@ -229,16 +321,24 @@ pub fn main() -> Result<(), JsValue> {
                 lower_left_corner_u_location.as_ref(),
                 &LOWER_LEFT_CORNER.to_array(),
             );
+            gl.uniform1f(render_count_u_location.as_ref(), unsafe { RENDER_COUNT });
 
-            // RENDER
-            gl.clear_color(0.0, 0.0, 0.0, 1.0);
-            gl.viewport(0, 0, WIDTH as i32, HEIGHT as i32);
-            gl.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
-            gl.draw_arrays(
-                WebGl2RenderingContext::TRIANGLES,
-                0,
-                (SIMPLE_QUAD_VERTICES.len() / 2) as i32,
+            // use texture previously rendered to
+            gl.bind_texture(
+                WebGl2RenderingContext::TEXTURE_2D,
+                Some(&textures[(unsafe { EVEN_ODD_COUNT + 1 } % 2) as usize]),
             );
+
+            // RENDER (TO CANVAS)
+            gl.bind_framebuffer(WebGl2RenderingContext::FRAMEBUFFER, None);
+            draw(&gl);
+
+            // RENDER (TO FRAMEBUFFER)
+            gl.bind_framebuffer(
+                WebGl2RenderingContext::FRAMEBUFFER,
+                Some(&framebuffer_objects[(unsafe { EVEN_ODD_COUNT } % 2) as usize]),
+            );
+            draw(&gl);
         }
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));

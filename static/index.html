@@ -63,7 +63,9 @@
         in vec2 v_position;
 
         out vec4 o_color;
-        
+
+        // video frame, received as a 2d texture
+        uniform sampler2D u_texture;
         uniform float u_width;
         uniform float u_height;
         uniform float u_time;
@@ -77,6 +79,7 @@
         uniform vec3 u_viewport_vertical_vec;
         uniform vec3 u_lower_left_corner;
         uniform int u_max_depth;
+        uniform float u_render_count;
         
         // STRUCTS //////////////////////////////////////////////////////
         struct Ray {
@@ -257,7 +260,17 @@
             // gamma correction
             color = sqrt(color);
         
-            o_color = vec4(color, 1.);
+            vec4 prev_frame = texture(u_texture, uv);
+
+            if (prev_frame.a == 0.) {
+                o_color = vec4(color, 1.);
+            } else {
+                vec3 merged_color = ((prev_frame.rgb * u_render_count) + color) / (u_render_count + 1.);
+                o_color = vec4(merged_color, 1.);
+            }
+
+          
+          
           }
       </script>
 </body>
