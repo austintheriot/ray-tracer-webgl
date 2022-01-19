@@ -1,10 +1,13 @@
 #![feature(format_args_capture)]
 extern crate console_error_panic_hook;
+#[macro_use]
+extern crate lazy_static;
 
 mod math;
 mod vec3;
 
 use std::cell::RefCell;
+use std::f64::consts::PI;
 use std::rc::Rc;
 use vec3::{Point, Vec3};
 use wasm_bindgen::prelude::*;
@@ -22,17 +25,23 @@ pub const PIXEL_ARRAY_LENGTH: usize = (WIDTH * HEIGHT * BYTES_PER_PIXEL) as usiz
 pub const ASPECT_RATIO: f64 = (WIDTH as f64) / (HEIGHT as f64);
 pub const SAMPLES_PER_PIXEL: u32 = 1;
 pub const MAX_DEPTH: u32 = 10;
-pub const VIEWPORT_HEIGHT: f64 = 2.0;
-pub const VIEWPORT_WIDTH: f64 = ASPECT_RATIO * VIEWPORT_HEIGHT;
 pub const FOCAL_LENGTH: f64 = 1.0;
 pub const CAMERA_ORIGIN: Point = Point(0., 0., 0.);
-pub const VIEWPORT_HORIZONTAL_VEC: Vec3 = Vec3(VIEWPORT_WIDTH, 0., 0.);
-pub const VIEWPORT_VERTICAL_VEC: Vec3 = Vec3(0., VIEWPORT_HEIGHT, 0.);
-pub const LOWER_LEFT_CORNER: Point = Vec3(
-    CAMERA_ORIGIN.0 - VIEWPORT_HORIZONTAL_VEC.0 / 2.,
-    CAMERA_ORIGIN.1 - VIEWPORT_VERTICAL_VEC.1 / 2.,
-    CAMERA_ORIGIN.2 - FOCAL_LENGTH,
-);
+pub const CAMERA_FIELD_OF_VIEW: f64 = 90.;
+lazy_static! {
+    static ref CAMERA_FIELD_OF_VIEW_RADIANS: f64 = (CAMERA_FIELD_OF_VIEW * PI) / 180.;
+    static ref CAMERA_H: f64 = (*CAMERA_FIELD_OF_VIEW_RADIANS / 2.).tan();
+    static ref VIEWPORT_HEIGHT: f64 = 2. * (*CAMERA_H);
+    static ref VIEWPORT_WIDTH: f64 = ASPECT_RATIO * (*VIEWPORT_HEIGHT);
+    static ref VIEWPORT_HORIZONTAL_VEC: Vec3 = Vec3(*VIEWPORT_WIDTH, 0., 0.);
+    static ref VIEWPORT_VERTICAL_VEC: Vec3 = Vec3(0., *VIEWPORT_HEIGHT, 0.);
+    static ref LOWER_LEFT_CORNER: Point = Vec3(
+        CAMERA_ORIGIN.0 - VIEWPORT_HORIZONTAL_VEC.0 / 2.,
+        CAMERA_ORIGIN.1 - VIEWPORT_VERTICAL_VEC.1 / 2.,
+        CAMERA_ORIGIN.2 - FOCAL_LENGTH,
+    );
+}
+
 pub const SIMPLE_QUAD_VERTICES: [f32; 12] = [
     -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
 ];
@@ -353,13 +362,13 @@ pub fn main() -> Result<(), JsValue> {
                 SAMPLES_PER_PIXEL as i32,
             );
             gl.uniform1f(aspect_ratio_u_location.as_ref(), ASPECT_RATIO as f32);
-            gl.uniform1f(viewport_height_u_location.as_ref(), VIEWPORT_HEIGHT as f32);
+            gl.uniform1f(viewport_height_u_location.as_ref(), *VIEWPORT_HEIGHT as f32);
             gl.uniform1f(focal_length_u_location.as_ref(), FOCAL_LENGTH as f32);
             gl.uniform3fv_with_f32_array(
                 camera_origin_u_location.as_ref(),
                 &CAMERA_ORIGIN.to_array(),
             );
-            gl.uniform1f(viewport_width_u_location.as_ref(), VIEWPORT_WIDTH as f32);
+            gl.uniform1f(viewport_width_u_location.as_ref(), *VIEWPORT_WIDTH as f32);
             gl.uniform3fv_with_f32_array(
                 viewport_horizontal_vec_u_location.as_ref(),
                 &VIEWPORT_HORIZONTAL_VEC.to_array(),
