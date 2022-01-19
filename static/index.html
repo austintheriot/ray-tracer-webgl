@@ -12,8 +12,17 @@
     <style>
         canvas {
             width: 100%;
-            max-width: 100vw;
             object-fit: contain;
+        }
+        #fps {
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+        }
+        button {
+            position: fixed;
+            top: 3rem;
+            left: 1rem;
         }
     </style>
 </head>
@@ -169,7 +178,7 @@
         }
 
         bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
-            float spin_radius = 0.61;
+            float spin_radius = 0.6;
             float divisor = 3.;
             float xy_speed_sensitivity = 0.001;
             float z_speed_sensitivity = 0.0013;
@@ -180,7 +189,7 @@
                 Sphere(vec3(spin_radius * cos(u_time * xy_speed_sensitivity + PI / divisor), 0.25 * cos(u_time * z_speed_sensitivity + PI / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + PI / divisor)), 0.1),
                 Sphere(vec3(spin_radius * cos(u_time * xy_speed_sensitivity + (2. * PI) / divisor), 0.25 * cos(u_time * z_speed_sensitivity + (2. * PI) / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + (2. * PI) / divisor)), 0.1),
                 Sphere(vec3(spin_radius * cos(u_time * xy_speed_sensitivity + (3. * PI) / divisor), 0.25 * cos(u_time * z_speed_sensitivity + (3. * PI) / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + (3. * PI) / divisor)), 0.1),
-                Sphere(vec3(0., -1000.5, -1.), 1000.)
+                Sphere(vec3(0., -100.5, -1.), 100.)
             );
             
             // test whether any geometry was hit. If it was, the hit_record will be updated with

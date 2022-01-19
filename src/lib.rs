@@ -48,9 +48,9 @@ static mut EVEN_ODD_COUNT: u32 = 0;
 /// Used for averaging previous frames together
 static mut RENDER_COUNT: f32 = 0.;
 /// The weight of the last frame compared to the each frame before.
-pub const LAST_FRAME_WEIGHT: f32 = 5.;
+pub const LAST_FRAME_WEIGHT: f32 = 2.;
 /// Limiting the counted renders allows creating a sliding average of frames
-static mut MAX_RENDER_COUNT: f32 = 10.;
+static mut MAX_RENDER_COUNT: f32 = 20.;
 static mut PREV_NOW: f64 = 0.;
 static mut PREV_FPS_UPDATE_TIME: f64 = 0.;
 static mut PREV_FPS: [f64; 50] = [0.; 50];
