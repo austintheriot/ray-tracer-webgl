@@ -4,11 +4,13 @@ extern crate console_error_panic_hook;
 mod math;
 mod vec3;
 
+use log::info;
 use std::cell::RefCell;
 use std::rc::Rc;
 use vec3::{Point, Vec3};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use web_sys::HtmlParagraphElement;
 use web_sys::{
     HtmlAnchorElement, HtmlScriptElement, WebGl2RenderingContext, WebGlFramebuffer, WebGlProgram,
     WebGlShader, WebGlTexture,
@@ -46,6 +48,9 @@ static mut SHOULD_SAVE: bool = false;
 static mut EVEN_ODD_COUNT: u32 = 0;
 /// Used for averaging previous frames together
 static mut RENDER_COUNT: f32 = 0.;
+static mut PREV_NOW: f64 = 0.;
+static mut PREV_FPS_UPDATE_TIME: f64 = 0.;
+static mut PREV_FPS: [f64; 50] = [0.; 50];
 
 fn compile_shader(
     gl: &WebGl2RenderingContext,
@@ -183,6 +188,40 @@ fn draw(gl: &WebGl2RenderingContext) {
     );
 }
 
+fn update_fps_indicator(p: &HtmlParagraphElement, now: f64) {
+    unsafe {
+        if now - PREV_FPS_UPDATE_TIME > 250. {
+            PREV_FPS_UPDATE_TIME = now;
+            let average_fps: f64 = PREV_FPS.iter().sum::<f64>() / (PREV_FPS.len() as f64);
+            p.set_text_content(Some(&format!("{:.2} fps", average_fps)))
+        }
+    }
+}
+
+fn update_moving_fps_array(now: f64) {
+    unsafe {
+        // calculate moving fps
+        let dt = now - PREV_NOW;
+        PREV_NOW = now;
+        let fps = 1000. / dt;
+        for (i, el) in PREV_FPS.into_iter().skip(1).enumerate() {
+            PREV_FPS[i] = el;
+        }
+        PREV_FPS[PREV_FPS.len() - 1] = fps;
+    }
+}
+
+fn update_render_globals() {
+    unsafe {
+        if !SHOULD_AVERAGE {
+            // only continuously render when averaging is being done
+            SHOULD_RENDER = false;
+        }
+        EVEN_ODD_COUNT += 1;
+        RENDER_COUNT += 1.;
+    };
+}
+
 #[wasm_bindgen]
 pub fn save_image() -> Result<(), JsValue> {
     unsafe {
@@ -212,6 +251,11 @@ pub fn main() -> Result<(), JsValue> {
         .get_context("webgl2")?
         .unwrap()
         .dyn_into::<WebGl2RenderingContext>()?;
+
+    let fps_indicator = document
+        .query_selector("#fps")?
+        .unwrap()
+        .dyn_into::<web_sys::HtmlParagraphElement>()?;
 
     canvas.set_width(WIDTH);
     canvas.set_height(HEIGHT);
@@ -290,53 +334,36 @@ pub fn main() -> Result<(), JsValue> {
     let g = f.clone();
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         if unsafe { SHOULD_RENDER } {
-            unsafe {
-                if !SHOULD_AVERAGE {
-                    // only continuously render when averaging is being done
-                    SHOULD_RENDER = false;
-                }
-                EVEN_ODD_COUNT += 1;
-                RENDER_COUNT += 1.;
-            }
+            let now = window.performance().unwrap().now();
+            update_render_globals();
+            update_moving_fps_array(now);
 
             // SET UNIFORMS
-            // tell the fragment shader to get the u_image texture from texture unit 0 (default)
             gl.uniform1i(texture_u_location.as_ref(), 0);
             gl.uniform1f(width_u_location.as_ref(), WIDTH as f32);
             gl.uniform1f(height_u_location.as_ref(), HEIGHT as f32);
             gl.uniform1i(max_depth_u_location.as_ref(), MAX_DEPTH as i32);
-            gl.uniform1f(
-                time_u_location.as_ref(),
-                window.performance().unwrap().now() as f32,
-            );
+            gl.uniform1f(time_u_location.as_ref(), now as f32);
             gl.uniform1i(
                 samples_per_pixel_u_location.as_ref(),
                 SAMPLES_PER_PIXEL as i32,
             );
-            // float aspect_ratio = u_width / u_height;
             gl.uniform1f(aspect_ratio_u_location.as_ref(), ASPECT_RATIO as f32);
-            // float viewport_height = 2.0;
             gl.uniform1f(viewport_height_u_location.as_ref(), VIEWPORT_HEIGHT as f32);
-            // float focal_length = 1.0;
             gl.uniform1f(focal_length_u_location.as_ref(), FOCAL_LENGTH as f32);
-            // vec3 camera_origin = vec3(0.);
             gl.uniform3fv_with_f32_array(
                 camera_origin_u_location.as_ref(),
                 &CAMERA_ORIGIN.to_array(),
             );
-            // float viewport_width = aspect_ratio * viewport_height;
             gl.uniform1f(viewport_width_u_location.as_ref(), VIEWPORT_WIDTH as f32);
-            // vec3 viewport_horizontal_vec = vec3(viewport_width, 0., 0.);
             gl.uniform3fv_with_f32_array(
                 viewport_horizontal_vec_u_location.as_ref(),
                 &VIEWPORT_HORIZONTAL_VEC.to_array(),
             );
-            // vec3 viewport_vertical_vec = vec3(0., viewport_height, 0.);
             gl.uniform3fv_with_f32_array(
                 viewport_vertical_vec_u_location.as_ref(),
                 &VIEWPORT_VERTICAL_VEC.to_array(),
             );
-            // vec3 lower_left_corner = camera_origin - viewport_horizontal_vec / 2. - viewport_vertical_vec / 2. - vec3(0., 0., focal_length);
             gl.uniform3fv_with_f32_array(
                 lower_left_corner_u_location.as_ref(),
                 &LOWER_LEFT_CORNER.to_array(),
@@ -344,17 +371,18 @@ pub fn main() -> Result<(), JsValue> {
             gl.uniform1f(render_count_u_location.as_ref(), unsafe { RENDER_COUNT });
             gl.uniform1i(should_average_u_location.as_ref(), SHOULD_AVERAGE as i32);
 
+            // RENDER
             // use texture previously rendered to
             gl.bind_texture(
                 WebGl2RenderingContext::TEXTURE_2D,
                 Some(&textures[(unsafe { EVEN_ODD_COUNT + 1 } % 2) as usize]),
             );
 
-            // RENDER (TO CANVAS)
+            // draw to canvas
             gl.bind_framebuffer(WebGl2RenderingContext::FRAMEBUFFER, None);
             draw(&gl);
 
-            // only need to render to framebuffer when doing averages of previous frames
+            // only need to draw to framebuffer when doing averages of previous frames
             if SHOULD_AVERAGE {
                 // RENDER (TO FRAMEBUFFER)
                 gl.bind_framebuffer(
@@ -383,6 +411,8 @@ pub fn main() -> Result<(), JsValue> {
                 a.set_download("canvas.png");
                 a.click();
             }
+
+            update_fps_indicator(&fps_indicator, now);
         }
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));

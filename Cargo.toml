@@ -38,5 +38,6 @@ features = [
   'Performance',
   'WebGlFramebuffer',
   'WebGlTexture',
-  'HtmlAnchorElement'
+  'HtmlAnchorElement',
+  'HtmlParagraphElement',
 ]
