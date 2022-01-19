@@ -4,14 +4,9 @@ const main = async () => {
   const canvas = document.querySelector('canvas');
   const saveImageButton = document.querySelector('button');
 
-  saveImageButton.onclick = () => {
-    const a = document.createElement('a');
-    a.href = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
-    a.download = 'canvas.png';
-    a.click();
-  };
+  const { main: wasmMain, save_image } = await import('./pkg');
 
-  const { main: wasmMain } = await import('./pkg');
+  saveImageButton.onclick = save_image;
 
   wasmMain();
 }

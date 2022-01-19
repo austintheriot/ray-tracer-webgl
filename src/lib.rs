@@ -10,8 +10,8 @@ use vec3::{Point, Vec3};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{
-    HtmlScriptElement, WebGl2RenderingContext, WebGlFramebuffer, WebGlProgram, WebGlShader,
-    WebGlTexture,
+    HtmlAnchorElement, HtmlScriptElement, WebGl2RenderingContext, WebGlFramebuffer, WebGlProgram,
+    WebGlShader, WebGlTexture,
 };
 
 pub const WIDTH: u32 = 1600;
@@ -40,6 +40,8 @@ pub const SHOULD_AVERAGE: bool = true;
 /// Unless averaging is taking place, this is set to false after revery render
 /// only updated back to true if something changes (i.e. input)
 static mut SHOULD_RENDER: bool = true;
+/// Whether the browser should save a screenshot of the canvas
+static mut SHOULD_SAVE: bool = false;
 /// Used to alternate which framebuffer to render to
 static mut EVEN_ODD_COUNT: u32 = 0;
 /// Used for averaging previous frames together
@@ -179,6 +181,16 @@ fn draw(gl: &WebGl2RenderingContext) {
         0,
         (SIMPLE_QUAD_VERTICES.len() / 2) as i32,
     );
+}
+
+#[wasm_bindgen]
+pub fn save_image() -> Result<(), JsValue> {
+    unsafe {
+        SHOULD_RENDER = true;
+        SHOULD_SAVE = true;
+    }
+
+    Ok(())
 }
 
 /// Entry function cannot be async, so spawns a local Future for running the real main function
@@ -350,6 +362,26 @@ pub fn main() -> Result<(), JsValue> {
                     Some(&framebuffer_objects[(unsafe { EVEN_ODD_COUNT } % 2) as usize]),
                 );
                 draw(&gl);
+            }
+
+            // if user has requested to save, save immediately after rendering
+            if unsafe { SHOULD_SAVE } {
+                unsafe {
+                    SHOULD_SAVE = false;
+                }
+                let data_url = canvas
+                    .to_data_url()
+                    .unwrap()
+                    .replace("image/png", "image/octet-stream");
+                let a = document
+                    .create_element("a")
+                    .unwrap()
+                    .dyn_into::<HtmlAnchorElement>()
+                    .unwrap();
+
+                a.set_href(&data_url);
+                a.set_download("canvas.png");
+                a.click();
             }
         }
         request_animation_frame(f.borrow().as_ref().unwrap());
