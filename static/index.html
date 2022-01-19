@@ -82,6 +82,7 @@
         uniform int u_max_depth;
         uniform float u_render_count;
         uniform bool u_should_average;
+        uniform float u_last_frame_weight;
         
         // STRUCTS //////////////////////////////////////////////////////
         struct Ray {
@@ -168,11 +169,18 @@
         }
 
         bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
+            float spin_radius = 0.61;
+            float divisor = 3.;
+            float xy_speed_sensitivity = 0.001;
+            float z_speed_sensitivity = 0.0013;
+
             // make list of hittable geometry
-            Sphere sphere_list[] = Sphere[3](
+            Sphere sphere_list[] = Sphere[5](
                 Sphere(vec3(0., 0., -1.), 0.5),
-                Sphere(vec3(-0.5, 0., -0.5), 0.1),
-                Sphere(vec3(0., -100.5, -1.), 100.)
+                Sphere(vec3(spin_radius * cos(u_time * xy_speed_sensitivity + PI / divisor), 0.25 * cos(u_time * z_speed_sensitivity + PI / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + PI / divisor)), 0.1),
+                Sphere(vec3(spin_radius * cos(u_time * xy_speed_sensitivity + (2. * PI) / divisor), 0.25 * cos(u_time * z_speed_sensitivity + (2. * PI) / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + (2. * PI) / divisor)), 0.1),
+                Sphere(vec3(spin_radius * cos(u_time * xy_speed_sensitivity + (3. * PI) / divisor), 0.25 * cos(u_time * z_speed_sensitivity + (3. * PI) / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + (3. * PI) / divisor)), 0.1),
+                Sphere(vec3(0., -1000.5, -1.), 1000.)
             );
             
             // test whether any geometry was hit. If it was, the hit_record will be updated with
@@ -262,7 +270,8 @@
                 if (prev_frame.a == 0.) {
                     o_color = vec4(color, 1.);
                 } else {
-                    vec3 merged_color = ((prev_frame.rgb * u_render_count) + color) / (u_render_count + 1.);
+                    float total_frames = u_render_count + u_last_frame_weight;
+                    vec3 merged_color = (prev_frame.rgb * u_render_count + color * u_last_frame_weight) / total_frames;
                     o_color = vec4(merged_color, 1.);
                 }
             } else {

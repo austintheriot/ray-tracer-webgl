@@ -4,7 +4,6 @@ extern crate console_error_panic_hook;
 mod math;
 mod vec3;
 
-use log::info;
 use std::cell::RefCell;
 use std::rc::Rc;
 use vec3::{Point, Vec3};
@@ -48,6 +47,10 @@ static mut SHOULD_SAVE: bool = false;
 static mut EVEN_ODD_COUNT: u32 = 0;
 /// Used for averaging previous frames together
 static mut RENDER_COUNT: f32 = 0.;
+/// The weight of the last frame compared to the each frame before.
+pub const LAST_FRAME_WEIGHT: f32 = 5.;
+/// Limiting the counted renders allows creating a sliding average of frames
+static mut MAX_RENDER_COUNT: f32 = 10.;
 static mut PREV_NOW: f64 = 0.;
 static mut PREV_FPS_UPDATE_TIME: f64 = 0.;
 static mut PREV_FPS: [f64; 50] = [0.; 50];
@@ -218,7 +221,7 @@ fn update_render_globals() {
             SHOULD_RENDER = false;
         }
         EVEN_ODD_COUNT += 1;
-        RENDER_COUNT += 1.;
+        RENDER_COUNT = (RENDER_COUNT + 1.).min(MAX_RENDER_COUNT);
     };
 }
 
@@ -300,6 +303,7 @@ pub fn main() -> Result<(), JsValue> {
     let max_depth_u_location = gl.get_uniform_location(&program, "u_max_depth");
     let render_count_u_location = gl.get_uniform_location(&program, "u_render_count");
     let should_average_u_location = gl.get_uniform_location(&program, "u_should_average");
+    let last_frame_weight_u_location = gl.get_uniform_location(&program, "u_last_frame_weight");
 
     // SET VERTEX BUFFER
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
@@ -370,6 +374,10 @@ pub fn main() -> Result<(), JsValue> {
             );
             gl.uniform1f(render_count_u_location.as_ref(), unsafe { RENDER_COUNT });
             gl.uniform1i(should_average_u_location.as_ref(), SHOULD_AVERAGE as i32);
+            gl.uniform1f(
+                last_frame_weight_u_location.as_ref(),
+                LAST_FRAME_WEIGHT as f32,
+            );
 
             // RENDER
             // use texture previously rendered to
