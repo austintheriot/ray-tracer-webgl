@@ -99,9 +99,18 @@
             vec3 direction;
         };
 
+        struct Material {
+            // 0 = Diffuse
+            // 1 = Metal
+            int type;
+            vec3 albedo; // or "reflectance"
+            float fuzz;
+        };
+
         struct Sphere {
             vec3 center;
             float radius;
+            Material material;
         };
 
         struct HitRecord {
@@ -109,6 +118,7 @@
             float hit_t;
             vec3 normal;
             bool front_face;
+            Material material;
         };
 
         // GLOBALS ////////////////////////////////////////////////////////
@@ -170,27 +180,22 @@
                 }
             }
 
+            hit_record.material = sphere.material;
             hit_record.hit_t = root;
             hit_record.hit_point = ray_at(r, hit_record.hit_t);
             vec3 outward_normal = (hit_record.hit_point - sphere.center) / sphere.radius;
             set_hit_record_front_face(hit_record, r, outward_normal);
             return true;
-        }
+    }
 
         bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
-            float spin_radius = 0.6;
-            float divisor = 3.;
-            float xy_speed_sensitivity = 0.001;
-            float z_speed_sensitivity = 0.0013;
-
-            // make list of hittable geometry
-            Sphere sphere_list[] = Sphere[5](
-                Sphere(vec3(0., 0., -1.), 0.5),
-                Sphere(vec3(spin_radius * cos(u_time * xy_speed_sensitivity + PI / divisor), 0.25 * cos(u_time * z_speed_sensitivity + PI / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + PI / divisor)), 0.1),
-                Sphere(vec3(spin_radius * cos(u_time * xy_speed_sensitivity + (2. * PI) / divisor), 0.25 * cos(u_time * z_speed_sensitivity + (2. * PI) / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + (2. * PI) / divisor)), 0.1),
-                Sphere(vec3(spin_radius * cos(u_time * xy_speed_sensitivity + (3. * PI) / divisor), 0.25 * cos(u_time * z_speed_sensitivity + (3. * PI) / divisor), -1. + spin_radius * sin(u_time * xy_speed_sensitivity + (3. * PI) / divisor)), 0.1),
-                Sphere(vec3(0., -100.5, -1.), 100.)
-            );
+            // compose the scene (hardcoded for now)
+            Sphere ground =  Sphere(vec3(0., -100.5, -1.),  100., Material(0, vec3(0.75, 0.6, 0.5), 0.));
+            Sphere center = Sphere(vec3(0., 0., -1.), 0.5, Material(0, vec3(0.3, 0.3, 0.4), 0.));
+            Sphere left = Sphere(vec3(-1., 0., -1.), 0.5, Material(1, vec3(1., 1., 1.), 0.));
+            Sphere left_small = Sphere(vec3(-0.45, -0.4, -0.7), 0.1, Material(1, vec3(1., 1., 1.), 0.));
+            Sphere right = Sphere(vec3(1., 0., -1.), 0.5, Material(1, vec3(1., 1., 1.), 0.5));
+            Sphere sphere_list[] = Sphere[5](center, left, left_small, right, ground);
             
             // test whether any geometry was hit. If it was, the hit_record will be updated with
             // the new hit data if the new hit was closer to the camera than the previous hit
@@ -210,6 +215,56 @@
             return hit_anything;
         }
 
+        bool near_zero(in vec3 v) {
+            float low_extreme = 1e-6;
+            return (v.x < low_extreme) && (v.y < low_extreme) && (v.z < low_extreme);
+        }
+
+        vec3 reflect(in vec3 v, in vec3 normal) {
+            return v - 2. * dot(v, normal) * normal;
+        }
+
+        // scatters a ray depending on what material was intersected with
+        bool scatter(in Ray r, in HitRecord hit_record, out vec3 attenuation, out Ray scattered_ray) {
+            // 0 = diffuse material (lambertian reflection)
+            if (hit_record.material.type == 0) {
+                // color attenuation on reflection
+                attenuation = hit_record.material.albedo;
+
+                // shoot ray off in random direction again
+                vec3 scatter_direction = hit_record.normal + random_unit_vec();
+                // scatter direction can become close to 0 if opposite the normal vector 
+                // (which can cause infinities later on)
+                if (near_zero(scatter_direction)) {
+                    scatter_direction = hit_record.normal;
+                }
+                scattered_ray = Ray(hit_record.hit_point, scatter_direction);
+
+                return true;
+            } 
+
+            // 1 = metal
+            if (hit_record.material.type == 1) {
+                // color attenuation on reflection
+                attenuation = hit_record.material.albedo;
+
+                // reflect ray off the surface
+                vec3 reflected_direction = reflect(r.direction, hit_record.normal);
+                // add in "fuzz" (optional)
+                vec3 fuzz = random_unit_vec() * hit_record.material.fuzz; 
+                vec3 fuzzed_direction = reflected_direction + fuzz;
+                scattered_ray = Ray(hit_record.hit_point, fuzzed_direction);
+
+                // count any rays that are reflected below the surface as  "absorbed"
+                bool reflected_above_surface = dot(hit_record.normal, fuzzed_direction) > 0.;
+
+                return reflected_above_surface;
+            } 
+
+            // unrecognized material integer (likely an error)
+            return false;
+        }
+
         // determine the color that a ray should be
         vec3 ray_color(in Ray r) {
              vec3 color = vec3(1.);
@@ -217,16 +272,19 @@
             for (int i = 0; i < u_max_depth; i++) {
                 // test for collisions with any geometry
                 // hit record gets modified with hit details if there was a hit
-                HitRecord hit_record = HitRecord(vec3(0., 0., -MAX_T), 0., vec3(0.), false);
+                HitRecord hit_record;
                 if (hit_world(r, MIN_T, MAX_T, hit_record)) {
-                    vec3 target = hit_record.hit_point + hit_record.normal + random_unit_vec();
+                    vec3 attenuation;
+                    Ray scattered_ray;
+                    bool did_scatter = scatter(r, hit_record, attenuation, scattered_ray);
 
-                    // color diminishes on reflection
-                    color *= 0.5;
-
-                    // shoot ray off in random direction again
-                    r.origin = hit_record.hit_point;
-                    r.direction = target - r.origin;
+                    if (did_scatter) {
+                        r = scattered_ray;
+                        color *= attenuation;
+                    } else {
+                        return vec3(0.);
+                    }
+                    
                 } else {
                     // no hit, return the sky gradient background
                     vec3 unit_direction = normalize(r.direction);
