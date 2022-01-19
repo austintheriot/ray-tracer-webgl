@@ -11,8 +11,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlScriptElement, WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
-pub const WIDTH: u32 = 400;
-pub const HEIGHT: u32 = 225;
+pub const WIDTH: u32 = 1600;
+pub const HEIGHT: u32 = 900;
 pub const BYTES_PER_PIXEL: u32 = 4;
 pub const ASPECT_RATIO: f64 = (WIDTH as f64) / (HEIGHT as f64);
 pub const SAMPLES_PER_PIXEL: u32 = 100;
@@ -186,7 +186,7 @@ pub fn main() -> Result<(), JsValue> {
         if unsafe { SHOULD_RENDER } {
             unsafe {
                 // set to false to only render on updates
-                SHOULD_RENDER = true;
+                SHOULD_RENDER = false;
             }
 
             // SET UNIFORMS
