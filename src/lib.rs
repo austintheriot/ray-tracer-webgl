@@ -18,8 +18,8 @@ use web_sys::{
     WebGlShader, WebGlTexture,
 };
 
-pub const WIDTH: u32 = 1280;
-pub const HEIGHT: u32 = 720;
+pub const WIDTH: u32 = 2048;
+pub const HEIGHT: u32 = 1152;
 pub const BYTES_PER_PIXEL: u32 = 4;
 pub const PIXEL_ARRAY_LENGTH: usize = (WIDTH * HEIGHT * BYTES_PER_PIXEL) as usize;
 pub const ASPECT_RATIO: f64 = (WIDTH as f64) / (HEIGHT as f64);
