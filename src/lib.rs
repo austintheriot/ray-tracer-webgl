@@ -4,7 +4,6 @@ extern crate console_error_panic_hook;
 mod math;
 mod vec3;
 
-use log::info;
 use std::cell::RefCell;
 use std::rc::Rc;
 use vec3::{Point, Vec3};
@@ -15,12 +14,12 @@ use web_sys::{
     WebGlTexture,
 };
 
-pub const WIDTH: u32 = 160;
-pub const HEIGHT: u32 = 90;
+pub const WIDTH: u32 = 1600;
+pub const HEIGHT: u32 = 900;
 pub const BYTES_PER_PIXEL: u32 = 4;
 pub const PIXEL_ARRAY_LENGTH: usize = (WIDTH * HEIGHT * BYTES_PER_PIXEL) as usize;
 pub const ASPECT_RATIO: f64 = (WIDTH as f64) / (HEIGHT as f64);
-pub const SAMPLES_PER_PIXEL: u32 = 5;
+pub const SAMPLES_PER_PIXEL: u32 = 1;
 pub const MAX_DEPTH: u32 = 5;
 pub const VIEWPORT_HEIGHT: f64 = 2.0;
 pub const VIEWPORT_WIDTH: f64 = ASPECT_RATIO * VIEWPORT_HEIGHT;
