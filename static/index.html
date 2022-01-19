@@ -80,6 +80,7 @@
         uniform vec3 u_lower_left_corner;
         uniform int u_max_depth;
         uniform float u_render_count;
+        uniform bool u_should_average;
         
         // STRUCTS //////////////////////////////////////////////////////
         struct Ray {
@@ -262,15 +263,19 @@
         
             vec4 prev_frame = texture(u_texture, uv);
 
-            if (prev_frame.a == 0.) {
-                o_color = vec4(color, 1.);
+            if (u_should_average) {
+                // average this frame with previous frames
+                if (prev_frame.a == 0.) {
+                    o_color = vec4(color, 1.);
+                } else {
+                    vec3 merged_color = ((prev_frame.rgb * u_render_count) + color) / (u_render_count + 1.);
+                    o_color = vec4(merged_color, 1.);
+                }
             } else {
-                vec3 merged_color = ((prev_frame.rgb * u_render_count) + color) / (u_render_count + 1.);
-                o_color = vec4(merged_color, 1.);
+                // plain rendering
+                o_color = vec4(color, 1.);
             }
-
-          
-          
+            
           }
       </script>
 </body>

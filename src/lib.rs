@@ -35,8 +35,14 @@ pub const LOWER_LEFT_CORNER: Point = Vec3(
 pub const SIMPLE_QUAD_VERTICES: [f32; 12] = [
     -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
 ];
+/// If the render should render incrementally, averaging together previous frames
+pub const SHOULD_AVERAGE: bool = true;
+/// Unless averaging is taking place, this is set to false after revery render
+/// only updated back to true if something changes (i.e. input)
 static mut SHOULD_RENDER: bool = true;
+/// Used to alternate which framebuffer to render to
 static mut EVEN_ODD_COUNT: u32 = 0;
+/// Used for averaging previous frames together
 static mut RENDER_COUNT: f32 = 0.;
 
 fn compile_shader(
@@ -107,12 +113,12 @@ fn create_texture(gl: &WebGl2RenderingContext) -> WebGlTexture {
     gl.tex_parameteri(
         WebGl2RenderingContext::TEXTURE_2D,
         WebGl2RenderingContext::TEXTURE_MIN_FILTER,
-        WebGl2RenderingContext::NEAREST as i32,
+        WebGl2RenderingContext::LINEAR as i32,
     );
     gl.tex_parameteri(
         WebGl2RenderingContext::TEXTURE_2D,
         WebGl2RenderingContext::TEXTURE_MAG_FILTER,
-        WebGl2RenderingContext::NEAREST as i32,
+        WebGl2RenderingContext::LINEAR as i32,
     );
 
     // load empty texture into gpu -- this will get rendered into later
@@ -237,6 +243,7 @@ pub fn main() -> Result<(), JsValue> {
     let lower_left_corner_u_location = gl.get_uniform_location(&program, "u_lower_left_corner");
     let max_depth_u_location = gl.get_uniform_location(&program, "u_max_depth");
     let render_count_u_location = gl.get_uniform_location(&program, "u_render_count");
+    let should_average_u_location = gl.get_uniform_location(&program, "u_should_average");
 
     // SET VERTEX BUFFER
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
@@ -272,8 +279,10 @@ pub fn main() -> Result<(), JsValue> {
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         if unsafe { SHOULD_RENDER } {
             unsafe {
-                // set to false to only render on updates
-                SHOULD_RENDER = true;
+                if !SHOULD_AVERAGE {
+                    // only continuously render when averaging is being done
+                    SHOULD_RENDER = false;
+                }
                 EVEN_ODD_COUNT += 1;
                 RENDER_COUNT += 1.;
             }
@@ -321,6 +330,7 @@ pub fn main() -> Result<(), JsValue> {
                 &LOWER_LEFT_CORNER.to_array(),
             );
             gl.uniform1f(render_count_u_location.as_ref(), unsafe { RENDER_COUNT });
+            gl.uniform1i(should_average_u_location.as_ref(), SHOULD_AVERAGE as i32);
 
             // use texture previously rendered to
             gl.bind_texture(
@@ -332,12 +342,15 @@ pub fn main() -> Result<(), JsValue> {
             gl.bind_framebuffer(WebGl2RenderingContext::FRAMEBUFFER, None);
             draw(&gl);
 
-            // RENDER (TO FRAMEBUFFER)
-            gl.bind_framebuffer(
-                WebGl2RenderingContext::FRAMEBUFFER,
-                Some(&framebuffer_objects[(unsafe { EVEN_ODD_COUNT } % 2) as usize]),
-            );
-            draw(&gl);
+            // only need to render to framebuffer when doing averages of previous frames
+            if SHOULD_AVERAGE {
+                // RENDER (TO FRAMEBUFFER)
+                gl.bind_framebuffer(
+                    WebGl2RenderingContext::FRAMEBUFFER,
+                    Some(&framebuffer_objects[(unsafe { EVEN_ODD_COUNT } % 2) as usize]),
+                );
+                draw(&gl);
+            }
         }
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));
