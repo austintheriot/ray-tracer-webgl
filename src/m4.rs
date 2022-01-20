@@ -70,7 +70,7 @@ impl Matrix4x4 {
         Matrix4x4([c, s, 0., 0., -s, c, 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.])
     }
 
-    pub fn multiply(a: Matrix4x4, b: Matrix4x4) -> Matrix4x4 {
+    pub fn multiply(self: Matrix4x4, b: Matrix4x4) -> Matrix4x4 {
         let matrix_size: usize = 4;
 
         // matrix coordinates
@@ -90,22 +90,22 @@ impl Matrix4x4 {
         let b31 = b.0[3 * matrix_size + 1];
         let b32 = b.0[3 * matrix_size + 2];
         let b33 = b.0[3 * matrix_size + 3];
-        let a00 = a.0[0 * matrix_size + 0];
-        let a01 = a.0[0 * matrix_size + 1];
-        let a02 = a.0[0 * matrix_size + 2];
-        let a03 = a.0[0 * matrix_size + 3];
-        let a10 = a.0[1 * matrix_size + 0];
-        let a11 = a.0[1 * matrix_size + 1];
-        let a12 = a.0[1 * matrix_size + 2];
-        let a13 = a.0[1 * matrix_size + 3];
-        let a20 = a.0[2 * matrix_size + 0];
-        let a21 = a.0[2 * matrix_size + 1];
-        let a22 = a.0[2 * matrix_size + 2];
-        let a23 = a.0[2 * matrix_size + 3];
-        let a30 = a.0[3 * matrix_size + 0];
-        let a31 = a.0[3 * matrix_size + 1];
-        let a32 = a.0[3 * matrix_size + 2];
-        let a33 = a.0[3 * matrix_size + 3];
+        let a00 = self.0[0 * matrix_size + 0];
+        let a01 = self.0[0 * matrix_size + 1];
+        let a02 = self.0[0 * matrix_size + 2];
+        let a03 = self.0[0 * matrix_size + 3];
+        let a10 = self.0[1 * matrix_size + 0];
+        let a11 = self.0[1 * matrix_size + 1];
+        let a12 = self.0[1 * matrix_size + 2];
+        let a13 = self.0[1 * matrix_size + 3];
+        let a20 = self.0[2 * matrix_size + 0];
+        let a21 = self.0[2 * matrix_size + 1];
+        let a22 = self.0[2 * matrix_size + 2];
+        let a23 = self.0[2 * matrix_size + 3];
+        let a30 = self.0[3 * matrix_size + 0];
+        let a31 = self.0[3 * matrix_size + 1];
+        let a32 = self.0[3 * matrix_size + 2];
+        let a33 = self.0[3 * matrix_size + 3];
 
         Matrix4x4([
             b00 * a00 + b01 * a10 + b02 * a20 + b03 * a30,

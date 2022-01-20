@@ -8,6 +8,7 @@ mod math;
 mod vec3;
 
 use log::info;
+use m4::Matrix4x4;
 use std::cell::RefCell;
 use std::f64::consts::PI;
 use std::rc::Rc;
@@ -437,14 +438,23 @@ pub fn handle_mouse_move(e: MouseEvent) {
     let mut state = (*STATE).lock().unwrap();
     let dx = (e.movement_x() as f64) * state.look_sensitivity;
     let dy = (e.movement_y() as f64) * state.look_sensitivity;
+
     let new_camera_front = state
         .camera_front
         .clone()
         .to_matrix()
         .rotate_y(dx)
+        .to_vec()
+        .normalize();
+
+    let dy = if new_camera_front.z() > 0. { -dy } else { dy };
+
+    let new_camera_front = new_camera_front
+        .to_matrix()
         .rotate_x(dy)
         .to_vec()
         .normalize();
+
     state.set_camera_front(new_camera_front);
 }
 
