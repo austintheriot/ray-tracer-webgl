@@ -104,7 +104,7 @@ impl Default for State {
         let even_odd_count = 0;
         let render_count = 0;
         let last_frame_weight = 1.;
-        let max_render_count = 5;
+        let max_render_count = 100_000;
         let prev_now = 0.;
         let prev_fps_update_time = 0.;
         let prev_fps = [0.; 50];
@@ -162,19 +162,32 @@ impl State {
     }
 
     fn set_camera_front(&mut self, new_camera_front: Vec3) {
-        let new_camera_front = new_camera_front.normalize();
-        self.camera_front = new_camera_front;
-        let camera_h = (self.camera_field_of_view / 2.).tan();
-        let look_at = &self.camera_origin + &self.camera_front;
-        let w = Vec3::normalize(&self.camera_origin - &look_at);
-        let u = Vec3::normalize(Vec3::cross(&self.vup, &w));
+        // recalculate "downstream" camera variables
+        let camera_front = new_camera_front;
+        let aspect_ratio = self.aspect_ratio;
+        let camera_field_of_view = self.camera_field_of_view;
+        let camera_h = (camera_field_of_view / 2.).tan();
+        let camera_origin = self.camera_origin.clone();
+        let look_at = &camera_origin + &self.camera_front;
+        let vup = self.vup.clone();
+        let w = Vec3::normalize(&camera_origin - &look_at);
+        let u = Vec3::normalize(Vec3::cross(&vup, &w));
         let v = Vec3::cross(&w, &u);
-        self.viewport_height = 2. * camera_h;
-        self.viewport_width = self.viewport_height * self.aspect_ratio;
-        self.horizontal = Vec3(self.viewport_width, 0., 0.) * u;
-        self.vertical = Vec3(0., self.viewport_height, 0.) * v;
-        self.lower_left_corner =
-            &self.camera_origin - &self.horizontal / 2. - &self.vertical / 2. - w;
+        let viewport_height = 2. * camera_h;
+        let viewport_width = viewport_height * aspect_ratio;
+        let horizontal = viewport_width * u;
+        let vertical = viewport_height * v;
+        let focal_length = 1.;
+        let lower_left_corner = &camera_origin - &horizontal / 2. - &vertical / 2. - w;
+
+        self.camera_front = camera_front;
+        self.vup = vup;
+        self.viewport_height = viewport_height;
+        self.viewport_width = viewport_width;
+        self.horizontal = horizontal;
+        self.vertical = vertical;
+        self.focal_length = focal_length;
+        self.lower_left_corner = lower_left_corner;
 
         // should render the new change
         self.render_count = 0;
@@ -409,8 +422,8 @@ pub fn handle_keyup(e: KeyboardEvent) {
 
 pub fn handle_mouse_move(e: MouseEvent) {
     let mut state = (*STATE).lock().unwrap();
-    let dx = (e.movement_x() as f64) * 0.1;
-    let dy = (e.movement_y() as f64) * 0.1;
+    let dx = (e.movement_x() as f64) * 0.01;
+    let dy = (e.movement_y() as f64) * 0.01;
     let new_camera_front = state
         .camera_front
         .clone()
@@ -420,12 +433,6 @@ pub fn handle_mouse_move(e: MouseEvent) {
         .to_vec()
         .normalize();
     state.set_camera_front(new_camera_front);
-
-    // let newCameraFront: Vec3 = [0, 0, 0];
-    // newCameraFront[0] = Math.cos(degreesToRadians(yaw)) * Math.cos(degreesToRadians(pitch));
-    // newCameraFront[1] = Math.sin(degreesToRadians(pitch));
-    // newCameraFront[2] = Math.sin(degreesToRadians(yaw)) * Math.cos(degreesToRadians(pitch));
-    // cameraFront = normalizeVec3(newCameraFront);
 }
 
 #[wasm_bindgen]
