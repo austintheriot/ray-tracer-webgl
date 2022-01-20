@@ -488,6 +488,12 @@ pub fn handle_wheel(e: WheelEvent) {
     state.set_fov(new_value);
 }
 
+pub fn handle_reset() {
+    // can take a mutex guard here, because it will never be called while render loop is running
+    let mut state = (*STATE).lock().unwrap();
+    *state = State::default();
+}
+
 pub fn handle_keydown(e: KeyboardEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
@@ -574,6 +580,11 @@ pub fn main() -> Result<(), JsValue> {
         .unwrap()
         .dyn_into::<HtmlButtonElement>()?;
 
+    let reset_button = document
+        .query_selector("#reset")?
+        .unwrap()
+        .dyn_into::<HtmlButtonElement>()?;
+
     let backdrop = document
         .query_selector("#backdrop")?
         .unwrap()
@@ -594,6 +605,10 @@ pub fn main() -> Result<(), JsValue> {
     let handle_resize = Closure::wrap(Box::new(handle_resize) as Box<dyn FnMut()>);
     window.set_onresize(Some(handle_resize.as_ref().unchecked_ref()));
     handle_resize.forget();
+
+    let handle_reset = Closure::wrap(Box::new(handle_reset) as Box<dyn FnMut()>);
+    reset_button.set_onclick(Some(handle_reset.as_ref().unchecked_ref()));
+    handle_reset.forget();
 
     let handle_save_image =
         Closure::wrap(Box::new(handle_save_image) as Box<dyn FnMut(MouseEvent)>);
