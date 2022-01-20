@@ -7,7 +7,6 @@ mod m4;
 mod math;
 mod vec3;
 
-use log::info;
 use std::cell::RefCell;
 use std::f64::consts::PI;
 use std::rc::Rc;
@@ -30,7 +29,7 @@ pub const LOOK_SENSITIVITY: f64 = 1.;
 pub const MOVEMENT_SPEED: f64 = 0.001;
 pub const VELOCITY_DAMPING: f64 = 0.5;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq, Clone)]
 struct KeydownMap {
     w: bool,
     a: bool,
@@ -46,6 +45,7 @@ impl KeydownMap {
     }
 }
 
+#[derive(PartialEq, Clone)]
 struct State {
     width: u32,
     height: u32,
@@ -183,6 +183,9 @@ impl Default for State {
 impl State {
     // updates all "downstream" variables once a rendering/camera variable has been changed
     fn update_pipeline(&mut self) {
+        // for comparing if any changes occured
+        let prev_state = self.clone();
+
         self.aspect_ratio = (self.width as f64) / (self.height as f64);
         let camera_h = (self.camera_field_of_view / 2.).tan();
         self.camera_front = Point(
@@ -201,12 +204,14 @@ impl State {
         self.lower_left_corner =
             &self.camera_origin - &self.horizontal / 2. - &self.vertical / 2. - w;
 
-        self.render_count = 0;
-        self.should_render = true;
+        if self != &prev_state {
+            self.render_count = 0;
+            self.should_render = true;
+        }
     }
 
     fn set_fov(&mut self, new_fov_radians: f64) {
-        self.camera_field_of_view = new_fov_radians.clamp(0.1, PI * 0.75);
+        self.camera_field_of_view = new_fov_radians.clamp(0.0001, PI * 0.75);
         self.update_pipeline();
     }
 
@@ -391,23 +396,25 @@ fn update_position(state: &mut MutexGuard<State>, dt: f64) {
 
     let camera_front = state.camera_front.clone();
     let vup = state.vup.clone();
+    // move slower when more "zoomed in"
+    let fov = state.camera_field_of_view.clone();
     if state.keydown_map.w {
-        state.camera_origin += &camera_front * MOVEMENT_SPEED * dt;
+        state.camera_origin += &camera_front * MOVEMENT_SPEED * dt * fov;
     }
     if state.keydown_map.a {
-        state.camera_origin -= Vec3::cross(&camera_front, &vup) * MOVEMENT_SPEED * dt;
+        state.camera_origin -= Vec3::cross(&camera_front, &vup) * MOVEMENT_SPEED * dt * fov;
     }
     if state.keydown_map.s {
-        state.camera_origin -= &camera_front * MOVEMENT_SPEED * dt;
+        state.camera_origin -= &camera_front * MOVEMENT_SPEED * dt * fov;
     }
     if state.keydown_map.d {
-        state.camera_origin += Vec3::cross(&camera_front, &vup) * MOVEMENT_SPEED * dt;
+        state.camera_origin += Vec3::cross(&camera_front, &vup) * MOVEMENT_SPEED * dt * fov;
     }
     if state.keydown_map.space {
-        state.camera_origin += &vup * MOVEMENT_SPEED * dt;
+        state.camera_origin += &vup * MOVEMENT_SPEED * dt * fov;
     }
     if state.keydown_map.shift {
-        state.camera_origin -= &vup * MOVEMENT_SPEED * dt;
+        state.camera_origin -= &vup * MOVEMENT_SPEED * dt * fov;
     }
 
     state.update_pipeline();
@@ -437,8 +444,7 @@ pub fn handle_wheel(e: WheelEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
     let adjustment = 1. * e.delta_y().signum();
-    let radians = degrees_to_radians(adjustment);
-    let new_value = state.camera_field_of_view + radians;
+    let new_value = state.camera_field_of_view * (1. + adjustment * 0.01);
     state.set_fov(new_value);
 }
 
@@ -454,7 +460,6 @@ pub fn handle_keydown(e: KeyboardEvent) {
         "Shift" => state.keydown_map.shift = true,
         _ => {}
     }
-    info!("{:#?}", state.keydown_map);
 }
 
 pub fn handle_keyup(e: KeyboardEvent) {
@@ -469,13 +474,13 @@ pub fn handle_keyup(e: KeyboardEvent) {
         "Shift" => state.keydown_map.shift = false,
         _ => {}
     }
-    info!("{:#?}", state.keydown_map);
 }
 
 pub fn handle_mouse_move(e: MouseEvent) {
     let mut state = (*STATE).lock().unwrap();
-    let dx = (e.movement_x() as f64) * state.look_sensitivity;
-    let dy = -(e.movement_y() as f64) * state.look_sensitivity;
+    // camera should move slower when more "zoomed in"
+    let dx = (e.movement_x() as f64) * state.look_sensitivity * state.camera_field_of_view;
+    let dy = -(e.movement_y() as f64) * state.look_sensitivity * state.camera_field_of_view;
     let yaw = state.yaw + dx;
     let pitch = state.pitch + dy;
     state.set_camera_angles(yaw, pitch);

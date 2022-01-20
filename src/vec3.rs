@@ -14,7 +14,7 @@ use std::ops::SubAssign;
 
 /// Color and position values are stored as floats
 /// Colors are actually *written* to memory as bytes (0->255)
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Vec3(pub f64, pub f64, pub f64);
 
 impl Vec3 {
