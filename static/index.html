@@ -15,15 +15,15 @@
     <div class="container">
         <canvas></canvas>
         <div class="controls">
-            <button id="save-image">Save Image</button>
             <p id="fps">0 fps</p>
         </div>
     </div>
     <div id="backdrop">
-        <p id="message">
-          Please enable first-person viewing mode
-          <button id="enable">Enable</button>
-        </p>
+        <div id="modal">
+            <p>Please enable first-person viewing mode</p>
+            <button id="enable">Enable</button>
+            <button id="save-image">Save Image</button>
+        </div>
       </div>
     <script id="vertex-shader" type="x-shader/x-vertex">#version 300 es
         in vec4 a_position;
