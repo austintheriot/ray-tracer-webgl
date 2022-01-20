@@ -1,4 +1,3 @@
-use crate::m4::Matrix4x4;
 use crate::math;
 use std::f64::consts::PI;
 use std::fmt::Formatter;
@@ -109,19 +108,9 @@ impl Vec3 {
         [self.x() as f32, self.y() as f32, self.z() as f32]
     }
 
-    pub fn to_matrix(self) -> Matrix4x4 {
-        self.into()
-    }
-
     pub fn near_zero(&self) -> bool {
         let threshold = 1e-10;
         self.x() < threshold && self.y() < threshold && self.z() < threshold
-    }
-}
-
-impl From<Matrix4x4> for Vec3 {
-    fn from(m4: Matrix4x4) -> Self {
-        Vec3(m4.0[3], m4.0[7], m4.0[11])
     }
 }
 

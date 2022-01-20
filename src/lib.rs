@@ -3,7 +3,6 @@ extern crate console_error_panic_hook;
 #[macro_use]
 extern crate lazy_static;
 
-mod m4;
 mod math;
 mod vec3;
 
