@@ -177,7 +177,6 @@ impl State {
         let viewport_width = viewport_height * aspect_ratio;
         let horizontal = viewport_width * u;
         let vertical = viewport_height * v;
-        let focal_length = 1.;
         let lower_left_corner = &camera_origin - &horizontal / 2. - &vertical / 2. - w;
 
         self.camera_front = camera_front;
@@ -186,7 +185,6 @@ impl State {
         self.viewport_width = viewport_width;
         self.horizontal = horizontal;
         self.vertical = vertical;
-        self.focal_length = focal_length;
         self.lower_left_corner = lower_left_corner;
 
         // should render the new change
