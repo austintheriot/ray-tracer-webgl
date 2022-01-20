@@ -9,28 +9,22 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="./main.js" defer></script>
-    <style>
-        canvas {
-            width: 100%;
-            object-fit: contain;
-        }
-        #fps {
-            position: fixed;
-            top: 1rem;
-            left: 1rem;
-        }
-        button {
-            position: fixed;
-            top: 3rem;
-            left: 1rem;
-        }
-    </style>
 </head>
 
 <body>
-    <canvas></canvas>
-    <p id="fps">0 fps</p>
-    <button>Save Image</button>
+    <div class="container">
+        <canvas></canvas>
+        <div class="controls">
+            <p id="fps">0 fps</p>
+        </div>
+    </div>
+    <div id="backdrop">
+        <div id="modal">
+            <p>Please enable first-person viewing mode</p>
+            <button id="enable">Enable</button>
+            <button id="save-image">Save Image</button>
+        </div>
+      </div>
     <script id="vertex-shader" type="x-shader/x-vertex">#version 300 es
         in vec4 a_position;
 
@@ -85,11 +79,11 @@
         uniform float u_viewport_width;
         uniform float u_focal_length;
         uniform vec3 u_camera_origin;
-        uniform vec3 u_viewport_horizontal_vec;
-        uniform vec3 u_viewport_vertical_vec;
+        uniform vec3 u_horizontal;
+        uniform vec3 u_vertical;
         uniform vec3 u_lower_left_corner;
         uniform int u_max_depth;
-        uniform float u_render_count;
+        uniform int u_render_count;
         uniform bool u_should_average;
         uniform float u_last_frame_weight;
         
@@ -233,6 +227,7 @@
 
                 // shoot ray off in random direction again
                 vec3 scatter_direction = hit_record.normal + random_unit_vec();
+                
                 // scatter direction can become close to 0 if opposite the normal vector 
                 // (which can cause infinities later on)
                 if (near_zero(scatter_direction)) {
@@ -250,9 +245,9 @@
 
                 // reflect ray off the surface
                 vec3 reflected_direction = reflect(r.direction, hit_record.normal);
+
                 // add in "fuzz" (optional)
-                vec3 fuzz = random_unit_vec() * hit_record.material.fuzz; 
-                vec3 fuzzed_direction = reflected_direction + fuzz;
+                vec3 fuzzed_direction = reflected_direction + hit_record.material.fuzz * random_in_unit_sphere();
                 scattered_ray = Ray(hit_record.hit_point, fuzzed_direction);
 
                 // count any rays that are reflected below the surface as  "absorbed"
@@ -316,7 +311,7 @@
                 vec2 randomized_uv = uv + random_within_pixel;
 
                 // create ray from camera origin to viewport
-                vec3 ray_direction = u_lower_left_corner + randomized_uv.x * u_viewport_horizontal_vec + randomized_uv.y * u_viewport_vertical_vec - u_camera_origin;
+                vec3 ray_direction = u_lower_left_corner + randomized_uv.x * u_horizontal + randomized_uv.y * u_vertical - u_camera_origin;
                 Ray r = Ray(u_camera_origin, ray_direction);
 
 
@@ -331,14 +326,15 @@
             color = sqrt(color);
         
             vec4 prev_frame = texture(u_texture, uv);
+            float render_count = float(u_render_count);
 
             if (u_should_average) {
                 // average this frame with previous frames
-                if (prev_frame.a == 0.) {
+                if (prev_frame.a == 0. || u_render_count == 0 || u_render_count == 1) {
                     o_color = vec4(color, 1.);
                 } else {
-                    float total_frames = u_render_count + u_last_frame_weight;
-                    vec3 merged_color = (prev_frame.rgb * u_render_count + color * u_last_frame_weight) / total_frames;
+                    float total_frames = render_count + u_last_frame_weight;
+                    vec3 merged_color = (prev_frame.rgb * render_count + color * u_last_frame_weight) / total_frames;
                     o_color = vec4(merged_color, 1.);
                 }
             } else {
