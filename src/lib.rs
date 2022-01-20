@@ -3,10 +3,12 @@ extern crate console_error_panic_hook;
 #[macro_use]
 extern crate lazy_static;
 
+mod m4;
 mod math;
 mod vec3;
 
 use log::info;
+use m4::Matrix4x4;
 use std::cell::RefCell;
 use std::f64::consts::PI;
 use std::rc::Rc;
