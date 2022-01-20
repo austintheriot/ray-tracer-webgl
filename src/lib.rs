@@ -47,6 +47,8 @@ struct State {
     max_depth: u32,
     focal_length: f64,
     camera_origin: Point,
+    pitch: f64,
+    yaw: f64,
     camera_front: Point,
     vup: Vec3,
     /// stored in radians
@@ -95,7 +97,13 @@ impl Default for State {
         let camera_field_of_view = PI / 2.;
         let camera_h = (camera_field_of_view / 2.).tan();
         let camera_origin = Point(0., 0., 0.);
-        let camera_front = Point(0., 0., -1.);
+        let pitch = 0.;
+        let yaw = -90.; // look down the z axis by default
+        let camera_front = Point(
+            f64::cos(degrees_to_radians(yaw)) * f64::cos(degrees_to_radians(pitch)),
+            f64::sin(degrees_to_radians(pitch)),
+            f64::sin(degrees_to_radians(yaw)) * f64::cos(degrees_to_radians(pitch)),
+        );
         let look_at = &camera_origin + &camera_front;
         let vup = Vec3(0., 1., 0.);
         let w = Vec3::normalize(&camera_origin - &look_at);
@@ -121,7 +129,7 @@ impl Default for State {
 
         let is_paused = true;
 
-        let look_sensitivity = 0.005;
+        let look_sensitivity = 0.1;
 
         let prev_fps_update_time = 0.;
         let prev_fps = [0.; 50];
@@ -133,6 +141,8 @@ impl Default for State {
             samples_per_pixel,
             max_depth,
             focal_length,
+            pitch,
+            yaw,
             camera_origin,
             camera_front,
             vup,
@@ -165,18 +175,30 @@ impl Default for State {
 impl State {
     fn set_fov(&mut self, new_fov_radians: f64) {
         // update all variables dependent on this variable
-        self.camera_field_of_view = new_fov_radians.clamp(0.1, PI * 0.75);
-        let camera_h = (self.camera_field_of_view / 2.).tan();
-        let look_at = &self.camera_origin + &self.camera_front;
-        let w = Vec3::normalize(&self.camera_origin - &look_at);
-        let u = Vec3::normalize(Vec3::cross(&self.vup, &w));
+        let width = self.width;
+        let height = self.height;
+        let aspect_ratio = (width as f64) / (height as f64);
+        let camera_field_of_view = new_fov_radians.clamp(0.1, PI * 0.75);
+        let camera_h = (camera_field_of_view / 2.).tan();
+        let camera_origin = self.camera_origin.clone();
+        let look_at = &camera_origin + &self.camera_front;
+        let vup = self.vup.clone();
+        let w = Vec3::normalize(&camera_origin - &look_at);
+        let u = Vec3::normalize(Vec3::cross(&vup, &w));
         let v = Vec3::cross(&w, &u);
-        self.viewport_height = 2. * camera_h;
-        self.viewport_width = self.viewport_height * self.aspect_ratio;
-        self.horizontal = Vec3(self.viewport_width, 0., 0.) * u;
-        self.vertical = Vec3(0., self.viewport_height, 0.) * v;
-        self.lower_left_corner =
-            &self.camera_origin - &self.horizontal / 2. - &self.vertical / 2. - w;
+        let viewport_height = 2. * camera_h;
+        let viewport_width = viewport_height * aspect_ratio;
+        let horizontal = viewport_width * u;
+        let vertical = viewport_height * v;
+        let lower_left_corner = &camera_origin - &horizontal / 2. - &vertical / 2. - w;
+
+        self.camera_field_of_view = camera_field_of_view;
+        self.vup = vup;
+        self.viewport_height = viewport_height;
+        self.viewport_width = viewport_width;
+        self.horizontal = horizontal;
+        self.vertical = vertical;
+        self.lower_left_corner = lower_left_corner;
 
         // should render the new change
         self.render_count = 0;
@@ -445,23 +467,17 @@ pub fn handle_keyup(e: KeyboardEvent) {
 pub fn handle_mouse_move(e: MouseEvent) {
     let mut state = (*STATE).lock().unwrap();
     let dx = (e.movement_x() as f64) * state.look_sensitivity;
-    let dy = (e.movement_y() as f64) * state.look_sensitivity;
+    let dy = -(e.movement_y() as f64) * state.look_sensitivity;
 
-    let new_camera_front = state
-        .camera_front
-        .clone()
-        .to_matrix()
-        .rotate_y(dx)
-        .to_vec()
-        .normalize();
+    state.yaw += dx;
+    state.pitch += dy;
+    state.pitch = f64::clamp(state.pitch, -89., 89.);
 
-    let dy = if new_camera_front.z() > 0. { -dy } else { dy };
-
-    let new_camera_front = new_camera_front
-        .to_matrix()
-        .rotate_x(dy)
-        .to_vec()
-        .normalize();
+    let new_camera_front = Point(
+        f64::cos(degrees_to_radians(state.yaw)) * f64::cos(degrees_to_radians(state.pitch)),
+        f64::sin(degrees_to_radians(state.pitch)),
+        f64::sin(degrees_to_radians(state.yaw)) * f64::cos(degrees_to_radians(state.pitch)),
+    );
 
     state.set_camera_front(new_camera_front);
 }
