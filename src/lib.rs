@@ -6,6 +6,7 @@ extern crate lazy_static;
 mod math;
 mod vec3;
 
+use log::info;
 use std::cell::RefCell;
 use std::f64::consts::PI;
 use std::rc::Rc;
@@ -18,7 +19,7 @@ use wasm_bindgen::JsCast;
 use web_sys::HtmlParagraphElement;
 use web_sys::{
     HtmlAnchorElement, HtmlScriptElement, WebGl2RenderingContext, WebGlFramebuffer, WebGlProgram,
-    WebGlShader, WebGlTexture,
+    WebGlShader, WebGlTexture, WheelEvent,
 };
 
 pub const BYTES_PER_PIXEL: u32 = 4;
@@ -31,6 +32,7 @@ struct State {
     max_depth: u32,
     focal_length: f64,
     camera_origin: Point,
+    /// stored in radians
     camera_field_of_view: f64,
     viewport_height: f64,
     viewport_width: f64,
@@ -63,9 +65,8 @@ impl Default for State {
         let height = 900;
         let camera_origin = Point(0., 0., 0.);
         let aspect_ratio = (width as f64) / (height as f64);
-        let camera_field_of_view = 90.;
-        let camera_field_of_view_radians = (camera_field_of_view * PI) / 180.;
-        let camera_h = (camera_field_of_view_radians / 2.).tan();
+        let camera_field_of_view = PI / 2.;
+        let camera_h = (camera_field_of_view / 2.).tan();
         let viewport_height = 2. * camera_h;
         let viewport_width = viewport_height * aspect_ratio;
         let viewport_horizontal_vec = Vec3(viewport_width, 0., 0.);
@@ -97,11 +98,32 @@ impl Default for State {
             even_odd_count: 0,
             render_count: 0.,
             last_frame_weight: 1.,
-            max_render_count: 10000.,
+            max_render_count: 5.,
             prev_now: 0.,
             prev_fps_update_time: 0.,
             prev_fps: [0.; 50],
         }
+    }
+}
+
+impl State {
+    fn set_fov(&mut self, new_fov_radians: f64) {
+        // update all variables dependent on this variable
+        self.camera_field_of_view = new_fov_radians.clamp(0.1, PI * 0.75);
+        let camera_h = (self.camera_field_of_view / 2.).tan();
+        self.viewport_height = 2. * camera_h;
+        self.viewport_width = self.viewport_height * self.aspect_ratio;
+        self.viewport_horizontal_vec = Vec3(self.viewport_width, 0., 0.);
+        self.viewport_vertical_vec = Vec3(0., self.viewport_height, 0.);
+        self.focal_length = 1.;
+        self.lower_left_corner = Vec3(
+            self.camera_origin.x() - self.viewport_horizontal_vec.0 / 2.,
+            self.camera_origin.y() - self.viewport_vertical_vec.1 / 2.,
+            self.camera_origin.z() - self.focal_length,
+        );
+
+        // should render the new change
+        self.should_render = true;
     }
 }
 
@@ -282,6 +304,28 @@ fn update_render_globals(state: &mut MutexGuard<State>) {
     state.render_count = (state.render_count + 1.).min(state.max_render_count);
 }
 
+fn degrees_to_radians(degrees: f64) -> f64 {
+    (degrees * PI) / 180.
+}
+
+#[wasm_bindgen]
+pub fn increase_fov(degrees: f64) {
+    // can take a mutex guard here, because it will never be called while render loop is running
+    let mut state = (*STATE).lock().unwrap();
+    let radians = degrees_to_radians(degrees);
+    state.camera_field_of_view += radians;
+}
+
+#[wasm_bindgen]
+pub fn handle_wheel(e: WheelEvent) {
+    // can take a mutex guard here, because it will never be called while render loop is running
+    let mut state = (*STATE).lock().unwrap();
+    let adjustment = 1. * e.delta_y().signum();
+    let radians = degrees_to_radians(adjustment);
+    let new_value = state.camera_field_of_view + radians;
+    state.set_fov(new_value);
+}
+
 #[wasm_bindgen]
 pub fn save_image() -> Result<(), JsValue> {
     // can take a mutex guard here, because it will never be called while render loop is running
@@ -321,6 +365,11 @@ pub fn main() -> Result<(), JsValue> {
     canvas.set_width(state.width);
     canvas.set_height(state.height);
     drop(state);
+
+    // ADD LISTENERS
+    let handle_wheel = Closure::wrap(Box::new(handle_wheel) as Box<dyn FnMut(WheelEvent)>);
+    window.set_onwheel(Some(handle_wheel.as_ref().unchecked_ref()));
+    handle_wheel.forget();
 
     //  SETUP PROGRAM
     let vertex_shader = {
