@@ -8,7 +8,6 @@ mod math;
 mod vec3;
 
 use log::info;
-use m4::Matrix4x4;
 use std::cell::RefCell;
 use std::f64::consts::PI;
 use std::rc::Rc;
@@ -28,8 +27,10 @@ use web_sys::{
 
 pub const BYTES_PER_PIXEL: u32 = 4;
 pub const LOOK_SENSITIVITY: f64 = 1.;
+pub const MOVEMENT_SPEED: f64 = 0.001;
+pub const VELOCITY_DAMPING: f64 = 0.5;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct KeydownMap {
     w: bool,
     a: bool,
@@ -37,6 +38,12 @@ struct KeydownMap {
     d: bool,
     space: bool,
     shift: bool,
+}
+
+impl KeydownMap {
+    pub fn all_false(&self) -> bool {
+        !self.w && !self.a && !self.s && !self.d && !self.space && !self.shift
+    }
 }
 
 struct State {
@@ -130,6 +137,7 @@ impl Default for State {
         let is_paused = true;
 
         let look_sensitivity = 0.1;
+        let keydown_map = KeydownMap::default();
 
         let prev_fps_update_time = 0.;
         let prev_fps = [0.; 50];
@@ -166,7 +174,7 @@ impl Default for State {
             prev_fps_update_time,
             prev_fps,
 
-            keydown_map: KeydownMap::default(),
+            keydown_map,
             look_sensitivity,
         }
     }
@@ -192,25 +200,20 @@ impl State {
         self.vertical = self.viewport_height * v;
         self.lower_left_corner =
             &self.camera_origin - &self.horizontal / 2. - &self.vertical / 2. - w;
+
+        self.render_count = 0;
+        self.should_render = true;
     }
 
     fn set_fov(&mut self, new_fov_radians: f64) {
         self.camera_field_of_view = new_fov_radians.clamp(0.1, PI * 0.75);
         self.update_pipeline();
-
-        // should render the new change
-        self.render_count = 0;
-        self.should_render = true;
     }
 
     fn set_camera_angles(&mut self, yaw: f64, pitch: f64) {
         self.yaw = yaw;
         self.pitch = f64::clamp(pitch, -89., 89.);
         self.update_pipeline();
-
-        // should render the new change
-        self.render_count = 0;
-        self.should_render = true;
     }
 }
 
@@ -370,9 +373,8 @@ fn update_fps_indicator(p: &HtmlParagraphElement, now: f64, state: &mut MutexGua
     }
 }
 
-fn update_moving_fps_array(now: f64, state: &mut MutexGuard<State>) {
+fn update_moving_fps_array(now: f64, state: &mut MutexGuard<State>, dt: f64) {
     // calculate moving fps
-    let dt = now - state.prev_now;
     state.prev_now = now;
     let fps = 1000. / dt;
     let last_index = state.prev_fps.len() - 1;
@@ -382,7 +384,34 @@ fn update_moving_fps_array(now: f64, state: &mut MutexGuard<State>) {
     state.prev_fps[last_index] = fps;
 }
 
-fn update_position(state: &mut MutexGuard<State>) {}
+fn update_position(state: &mut MutexGuard<State>, dt: f64) {
+    if state.keydown_map.all_false() {
+        return;
+    }
+
+    let camera_front = state.camera_front.clone();
+    let vup = state.vup.clone();
+    if state.keydown_map.w {
+        state.camera_origin += &camera_front * MOVEMENT_SPEED * dt;
+    }
+    if state.keydown_map.a {
+        state.camera_origin -= Vec3::cross(&camera_front, &vup) * MOVEMENT_SPEED * dt;
+    }
+    if state.keydown_map.s {
+        state.camera_origin -= &camera_front * MOVEMENT_SPEED * dt;
+    }
+    if state.keydown_map.d {
+        state.camera_origin += Vec3::cross(&camera_front, &vup) * MOVEMENT_SPEED * dt;
+    }
+    if state.keydown_map.space {
+        state.camera_origin += &vup * MOVEMENT_SPEED * dt;
+    }
+    if state.keydown_map.shift {
+        state.camera_origin -= &vup * MOVEMENT_SPEED * dt;
+    }
+
+    state.update_pipeline();
+}
 
 fn update_render_globals(state: &mut MutexGuard<State>) {
     if !state.should_average {
@@ -425,20 +454,22 @@ pub fn handle_keydown(e: KeyboardEvent) {
         "Shift" => state.keydown_map.shift = true,
         _ => {}
     }
+    info!("{:#?}", state.keydown_map);
 }
 
 pub fn handle_keyup(e: KeyboardEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
     match e.key().as_str() {
-        "w" => state.keydown_map.w = true,
-        "a" => state.keydown_map.a = true,
-        "s" => state.keydown_map.s = true,
-        "d" => state.keydown_map.d = true,
-        " " => state.keydown_map.space = true,
-        "Shift" => state.keydown_map.shift = true,
+        "w" => state.keydown_map.w = false,
+        "a" => state.keydown_map.a = false,
+        "s" => state.keydown_map.s = false,
+        "d" => state.keydown_map.d = false,
+        " " => state.keydown_map.space = false,
+        "Shift" => state.keydown_map.shift = false,
         _ => {}
     }
+    info!("{:#?}", state.keydown_map);
 }
 
 pub fn handle_mouse_move(e: MouseEvent) {
@@ -638,6 +669,10 @@ pub fn main() -> Result<(), JsValue> {
         // try to lock the mutex while it is in use
         let mut state = (*STATE).lock().unwrap();
 
+        let now = window.performance().unwrap().now();
+        let dt = now - state.prev_now;
+        update_position(&mut state, dt);
+
         // don't render while paused unless trying to save
         // OR unless it's the very first frame
         let should_render = (state.should_render && !state.is_paused)
@@ -648,11 +683,8 @@ pub fn main() -> Result<(), JsValue> {
                 && state.render_count == 0);
 
         if should_render {
-            let now = window.performance().unwrap().now();
-
-            update_position(&mut state);
             update_render_globals(&mut state);
-            update_moving_fps_array(now, &mut state);
+            update_moving_fps_array(now, &mut state, dt);
 
             // SET UNIFORMS
             gl.uniform1i(texture_u_location.as_ref(), 0);

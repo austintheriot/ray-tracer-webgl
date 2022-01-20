@@ -5,9 +5,12 @@ use std::fmt::Formatter;
 use std::ops::Add;
 use std::ops::AddAssign;
 use std::ops::Div;
+use std::ops::DivAssign;
 use std::ops::Mul;
+use std::ops::MulAssign;
 use std::ops::Neg;
 use std::ops::Sub;
+use std::ops::SubAssign;
 
 /// Color and position values are stored as floats
 /// Colors are actually *written* to memory as bytes (0->255)
@@ -109,6 +112,11 @@ impl Vec3 {
     pub fn to_matrix(self) -> Matrix4x4 {
         self.into()
     }
+
+    pub fn near_zero(&self) -> bool {
+        let threshold = 1e-10;
+        self.x() < threshold && self.y() < threshold && self.z() < threshold
+    }
 }
 
 impl From<Matrix4x4> for Vec3 {
@@ -154,6 +162,46 @@ impl AddAssign for Vec3 {
         self.0 += rhs.0;
         self.1 += rhs.1;
         self.2 += rhs.2;
+    }
+}
+
+impl AddAssign<f64> for Vec3 {
+    fn add_assign(&mut self, rhs: f64) {
+        self.0 += rhs;
+        self.1 += rhs;
+        self.2 += rhs;
+    }
+}
+
+impl SubAssign for Vec3 {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 -= rhs.0;
+        self.1 -= rhs.1;
+        self.2 -= rhs.2;
+    }
+}
+
+impl SubAssign<f64> for Vec3 {
+    fn sub_assign(&mut self, rhs: f64) {
+        self.0 -= rhs;
+        self.1 -= rhs;
+        self.2 -= rhs;
+    }
+}
+
+impl MulAssign<f64> for Vec3 {
+    fn mul_assign(&mut self, rhs: f64) {
+        self.0 *= rhs;
+        self.1 *= rhs;
+        self.2 *= rhs;
+    }
+}
+
+impl DivAssign<f64> for Vec3 {
+    fn div_assign(&mut self, rhs: f64) {
+        self.0 /= rhs;
+        self.1 /= rhs;
+        self.2 /= rhs;
     }
 }
 
