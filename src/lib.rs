@@ -59,8 +59,8 @@ struct State {
 
 impl Default for State {
     fn default() -> Self {
-        let width = 2048;
-        let height = 1152;
+        let width = 1200;
+        let height = 900;
         let camera_origin = Point(0., 0., 0.);
         let aspect_ratio = (width as f64) / (height as f64);
         let camera_field_of_view = 90.;
