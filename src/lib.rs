@@ -54,6 +54,8 @@ struct State {
     horizontal: Vec3,
     vertical: Vec3,
     lower_left_corner: Point,
+
+    // RENDER STATE
     /// If the render should render incrementally, averaging together previous frames
     should_average: bool,
     /// Unless averaging is taking place, this is set to false after revery render
@@ -69,10 +71,16 @@ struct State {
     last_frame_weight: f32,
     /// Limiting the counted renders allows creating a sliding average of frames
     max_render_count: u32,
+    /// Used for calculating time delta in animation loop
     prev_now: f64,
+
+    // MOVEMENT
+    keydown_map: KeydownMap,
+    look_sensitivity: f64,
+
+    // ANALYTICS
     prev_fps_update_time: f64,
     prev_fps: [f64; 50],
-    keydown_map: KeydownMap,
 }
 
 impl Default for State {
@@ -106,6 +114,9 @@ impl Default for State {
         let last_frame_weight = 1.;
         let max_render_count = 100_000;
         let prev_now = 0.;
+
+        let look_sensitivity = 0.005;
+
         let prev_fps_update_time = 0.;
         let prev_fps = [0.; 50];
 
@@ -136,6 +147,7 @@ impl Default for State {
             prev_fps_update_time,
             prev_fps,
             keydown_map: KeydownMap::default(),
+            look_sensitivity,
         }
     }
 }
@@ -361,6 +373,8 @@ fn update_moving_fps_array(now: f64, state: &mut MutexGuard<State>) {
     state.prev_fps[last_index] = fps;
 }
 
+fn update_position(state: &mut MutexGuard<State>) {}
+
 fn update_render_globals(state: &mut MutexGuard<State>) {
     if !state.should_average {
         // only continuously render when averaging is being done
@@ -420,8 +434,8 @@ pub fn handle_keyup(e: KeyboardEvent) {
 
 pub fn handle_mouse_move(e: MouseEvent) {
     let mut state = (*STATE).lock().unwrap();
-    let dx = (e.movement_x() as f64) * 0.01;
-    let dy = (e.movement_y() as f64) * 0.01;
+    let dx = (e.movement_x() as f64) * state.look_sensitivity;
+    let dy = (e.movement_y() as f64) * state.look_sensitivity;
     let new_camera_front = state
         .camera_front
         .clone()
@@ -574,6 +588,7 @@ pub fn main() -> Result<(), JsValue> {
         if state.should_render {
             let now = window.performance().unwrap().now();
 
+            update_position(&mut state);
             update_render_globals(&mut state);
             update_moving_fps_array(now, &mut state);
 
