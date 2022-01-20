@@ -8,7 +8,6 @@ mod math;
 mod vec3;
 
 use log::info;
-use m4::Matrix4x4;
 use std::cell::RefCell;
 use std::f64::consts::PI;
 use std::rc::Rc;
@@ -87,8 +86,8 @@ impl Default for State {
         let camera_front = Point(0., 0., -1.);
         let look_at = &camera_origin + &camera_front;
         let vup = Vec3(0., 1., 0.);
-        let w = Vec3::normalize(&(&camera_origin - &look_at));
-        let u = Vec3::normalize(&Vec3::cross(&vup, &w));
+        let w = Vec3::normalize(&camera_origin - &look_at);
+        let u = Vec3::normalize(Vec3::cross(&vup, &w));
         let v = Vec3::cross(&w, &u);
         let viewport_height = 2. * camera_h;
         let viewport_width = viewport_height * aspect_ratio;
@@ -147,8 +146,27 @@ impl State {
         self.camera_field_of_view = new_fov_radians.clamp(0.1, PI * 0.75);
         let camera_h = (self.camera_field_of_view / 2.).tan();
         let look_at = &self.camera_origin + &self.camera_front;
-        let w = Vec3::normalize(&(&self.camera_origin - &look_at));
-        let u = Vec3::normalize(&Vec3::cross(&self.vup, &w));
+        let w = Vec3::normalize(&self.camera_origin - &look_at);
+        let u = Vec3::normalize(Vec3::cross(&self.vup, &w));
+        let v = Vec3::cross(&w, &u);
+        self.viewport_height = 2. * camera_h;
+        self.viewport_width = self.viewport_height * self.aspect_ratio;
+        self.horizontal = Vec3(self.viewport_width, 0., 0.) * u;
+        self.vertical = Vec3(0., self.viewport_height, 0.) * v;
+        self.lower_left_corner =
+            &self.camera_origin - &self.horizontal / 2. - &self.vertical / 2. - w;
+
+        // should render the new change
+        self.should_render = true;
+    }
+
+    fn set_camera_front(&mut self, new_camera_front: Vec3) {
+        let new_camera_front = new_camera_front.normalize();
+        self.camera_front = new_camera_front;
+        let camera_h = (self.camera_field_of_view / 2.).tan();
+        let look_at = &self.camera_origin + &self.camera_front;
+        let w = Vec3::normalize(&self.camera_origin - &look_at);
+        let u = Vec3::normalize(Vec3::cross(&self.vup, &w));
         let v = Vec3::cross(&w, &u);
         self.viewport_height = 2. * camera_h;
         self.viewport_width = self.viewport_height * self.aspect_ratio;
@@ -388,8 +406,18 @@ pub fn handle_keyup(e: KeyboardEvent) {
 }
 
 pub fn handle_mouse_move(e: MouseEvent) {
-    let dx = e.movement_x();
-    let dy = e.movement_y();
+    let mut state = (*STATE).lock().unwrap();
+    let dx = (e.movement_x() as f64) * 0.1;
+    let dy = (e.movement_y() as f64) * 0.1;
+    let new_camera_front = state
+        .camera_front
+        .clone()
+        .to_matrix()
+        .rotate_y(dx)
+        .rotate_x(dy)
+        .to_vec()
+        .normalize();
+    state.set_camera_front(new_camera_front);
 
     // let newCameraFront: Vec3 = [0, 0, 0];
     // newCameraFront[0] = Math.cos(degreesToRadians(yaw)) * Math.cos(degreesToRadians(pitch));

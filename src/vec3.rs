@@ -63,8 +63,8 @@ impl Vec3 {
         )
     }
 
-    pub fn normalize(v: &Vec3) -> Vec3 {
-        v / v.length()
+    pub fn normalize(self: Vec3) -> Vec3 {
+        self.clone() / self.length()
     }
 
     /// from -1->1 to 0->1
@@ -99,7 +99,7 @@ impl Vec3 {
 
     /// along the EDGE of the unit sphere
     pub fn random_unit_vector() -> Vec3 {
-        Vec3::normalize(&Vec3::random_point_in_unit_sphere())
+        Vec3::normalize(Vec3::random_point_in_unit_sphere())
     }
 
     pub fn to_array(&self) -> [f32; 3] {
