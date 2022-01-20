@@ -17,11 +17,12 @@ use std::sync::MutexGuard;
 use vec3::{Point, Vec3};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use web_sys::Element;
 use web_sys::HtmlParagraphElement;
 use web_sys::MouseEvent;
 use web_sys::{
-    HtmlAnchorElement, HtmlScriptElement, KeyboardEvent, WebGl2RenderingContext, WebGlFramebuffer,
-    WebGlProgram, WebGlShader, WebGlTexture, WheelEvent,
+    Event, HtmlAnchorElement, HtmlButtonElement, HtmlDivElement, HtmlScriptElement, KeyboardEvent,
+    WebGl2RenderingContext, WebGlFramebuffer, WebGlProgram, WebGlShader, WebGlTexture, WheelEvent,
 };
 
 pub const BYTES_PER_PIXEL: u32 = 4;
@@ -482,12 +483,24 @@ pub fn main() -> Result<(), JsValue> {
         .unwrap()
         .dyn_into::<web_sys::HtmlParagraphElement>()?;
 
+    let enable_button = document
+        .query_selector("#enable")?
+        .unwrap()
+        .dyn_into::<HtmlButtonElement>()?;
+
+    let backdrop = document
+        .query_selector("#backdrop")?
+        .unwrap()
+        .dyn_into::<HtmlDivElement>()?;
+
     let state = (*STATE).lock().unwrap();
     canvas.set_width(state.width);
     canvas.set_height(state.height);
     drop(state);
 
     // ADD LISTENERS
+    // not planning on removing any of these listeners for the
+    // duration of the program, so using `forget()` here is fine for now
     let handle_wheel = Closure::wrap(Box::new(handle_wheel) as Box<dyn FnMut(WheelEvent)>);
     window.set_onwheel(Some(handle_wheel.as_ref().unchecked_ref()));
     handle_wheel.forget();
@@ -499,6 +512,33 @@ pub fn main() -> Result<(), JsValue> {
     let handle_keyup = Closure::wrap(Box::new(handle_keyup) as Box<dyn FnMut(KeyboardEvent)>);
     window.set_onkeyup(Some(handle_keyup.as_ref().unchecked_ref()));
     handle_keyup.forget();
+
+    let handle_enable_button_click = {
+        let canvas = canvas.clone();
+        Closure::wrap(Box::new(move |_| {
+            let element: &Element = canvas.as_ref();
+            element.request_pointer_lock();
+        }) as Box<dyn FnMut(MouseEvent)>)
+    };
+    enable_button.set_onclick(Some(handle_enable_button_click.as_ref().unchecked_ref()));
+    handle_enable_button_click.forget();
+
+    let handle_onpointerlockchange = {
+        let canvas = canvas.clone();
+        let document = document.clone();
+        Closure::wrap(Box::new(move |_| {
+            if let Some(pointer_lock_element) = document.pointer_lock_element() {
+                let canvas_as_element: &Element = canvas.as_ref();
+                if &pointer_lock_element == canvas_as_element {
+                    backdrop.class_list().add_1("hide").unwrap();
+                    return;
+                }
+            }
+            backdrop.class_list().remove_1("hide").unwrap();
+        }) as Box<dyn FnMut(Event)>)
+    };
+    document.set_onpointerlockchange(Some(handle_onpointerlockchange.as_ref().unchecked_ref()));
+    handle_onpointerlockchange.forget();
 
     let handle_mouse_move =
         Closure::wrap(Box::new(handle_mouse_move) as Box<dyn FnMut(MouseEvent)>);

@@ -41,5 +41,8 @@ features = [
   'HtmlAnchorElement',
   'HtmlParagraphElement',
   'WheelEvent',
-  'KeyboardEvent'
+  'KeyboardEvent',
+  'HtmlButtonElement',
+  'DomTokenList',
+  'HtmlDivElement',
 ]
