@@ -58,6 +58,8 @@ struct State {
     lower_left_corner: Point,
 
     // RENDER STATE
+    /// is the modal up that asks the user to enable first-person viewing mode?
+    is_paused: bool,
     /// If the render should render incrementally, averaging together previous frames
     should_average: bool,
     /// Unless averaging is taking place, this is set to false after revery render
@@ -117,6 +119,8 @@ impl Default for State {
         let max_render_count = 100_000;
         let prev_now = 0.;
 
+        let is_paused = true;
+
         let look_sensitivity = 0.005;
 
         let prev_fps_update_time = 0.;
@@ -138,6 +142,8 @@ impl Default for State {
             horizontal: horizontal,
             vertical: vertical,
             lower_left_corner,
+
+            is_paused,
             should_average,
             should_render,
             should_save,
@@ -146,8 +152,10 @@ impl Default for State {
             last_frame_weight,
             max_render_count,
             prev_now,
+
             prev_fps_update_time,
             prev_fps,
+
             keydown_map: KeydownMap::default(),
             look_sensitivity,
         }
@@ -543,15 +551,18 @@ pub fn main() -> Result<(), JsValue> {
     let handle_onpointerlockchange = {
         let canvas = canvas.clone();
         let document = document.clone();
+        let state = STATE.clone();
         Closure::wrap(Box::new(move |_| {
             if let Some(pointer_lock_element) = document.pointer_lock_element() {
                 let canvas_as_element: &Element = canvas.as_ref();
                 if &pointer_lock_element == canvas_as_element {
                     backdrop.class_list().add_1("hide").unwrap();
+                    (*state).lock().unwrap().is_paused = false;
                     return;
                 }
             }
             backdrop.class_list().remove_1("hide").unwrap();
+            (*state).lock().unwrap().is_paused = true;
         }) as Box<dyn FnMut(Event)>)
     };
     document.set_onpointerlockchange(Some(handle_onpointerlockchange.as_ref().unchecked_ref()));
@@ -642,7 +653,17 @@ pub fn main() -> Result<(), JsValue> {
         // since it is synchronous and no other function calls can
         // try to lock the mutex while it is in use
         let mut state = (*STATE).lock().unwrap();
-        if state.should_render {
+
+        // don't render while paused unless trying to save
+        // OR unless it's the very first frame
+        let should_render = (state.should_render && !state.is_paused)
+            || (state.should_render && state.is_paused && state.should_save)
+            || (state.should_render
+                && state.is_paused
+                && !state.should_save
+                && state.render_count == 0);
+
+        if should_render {
             let now = window.performance().unwrap().now();
 
             update_position(&mut state);
