@@ -31,13 +31,15 @@ struct State {
     samples_per_pixel: u32,
     max_depth: u32,
     focal_length: f64,
-    camera_origin: Point,
+    look_from: Point,
+    look_at: Point,
+    vup: Vec3,
     /// stored in radians
     camera_field_of_view: f64,
     viewport_height: f64,
     viewport_width: f64,
-    viewport_horizontal_vec: Vec3,
-    viewport_vertical_vec: Vec3,
+    horizontal: Vec3,
+    vertical: Vec3,
     lower_left_corner: Point,
     /// If the render should render incrementally, averaging together previous frames
     should_average: bool,
@@ -63,45 +65,61 @@ impl Default for State {
     fn default() -> Self {
         let width = 1200;
         let height = 900;
-        let camera_origin = Point(0., 0., 0.);
         let aspect_ratio = (width as f64) / (height as f64);
         let camera_field_of_view = PI / 2.;
         let camera_h = (camera_field_of_view / 2.).tan();
+        let look_from = Point(0., 0., 0.);
+        let look_at = Point(0., 0., -1.);
+        let vup = Vec3(0., 1., 0.);
+        let w = Vec3::normalize(&(&look_from - &look_at));
+        let u = Vec3::normalize(&Vec3::cross(&vup, &w));
+        let v = Vec3::cross(&w, &u);
         let viewport_height = 2. * camera_h;
         let viewport_width = viewport_height * aspect_ratio;
-        let viewport_horizontal_vec = Vec3(viewport_width, 0., 0.);
-        let viewport_vertical_vec = Vec3(0., viewport_height, 0.);
+        let horizontal = viewport_width * u;
+        let vertical = viewport_height * v;
         let focal_length = 1.;
-        let lower_left_corner = Vec3(
-            camera_origin.x() - viewport_horizontal_vec.0 / 2.,
-            camera_origin.y() - viewport_vertical_vec.1 / 2.,
-            camera_origin.z() - focal_length,
-        );
+        let lower_left_corner = &look_from - &horizontal / 2. - &vertical / 2. - w;
+
+        let samples_per_pixel = 1;
+        let max_depth = 10;
+        let should_average = true;
+        let should_render = true;
+        let should_save = false;
+        let even_odd_count = 0;
+        let render_count = 0.;
+        let last_frame_weight = 1.;
+        let max_render_count = 5.;
+        let prev_now = 0.;
+        let prev_fps_update_time = 0.;
+        let prev_fps = [0.; 50];
 
         State {
             width,
             height,
             aspect_ratio,
-            samples_per_pixel: 1,
-            max_depth: 10,
-            focal_length: 1.,
-            camera_origin,
+            samples_per_pixel,
+            max_depth,
+            focal_length,
+            look_from,
+            look_at,
+            vup,
             camera_field_of_view,
             viewport_height,
             viewport_width,
-            viewport_horizontal_vec,
-            viewport_vertical_vec,
+            horizontal: horizontal,
+            vertical: vertical,
             lower_left_corner,
-            should_average: true,
-            should_render: true,
-            should_save: false,
-            even_odd_count: 0,
-            render_count: 0.,
-            last_frame_weight: 1.,
-            max_render_count: 5.,
-            prev_now: 0.,
-            prev_fps_update_time: 0.,
-            prev_fps: [0.; 50],
+            should_average,
+            should_render,
+            should_save,
+            even_odd_count,
+            render_count,
+            last_frame_weight,
+            max_render_count,
+            prev_now,
+            prev_fps_update_time,
+            prev_fps,
         }
     }
 }
@@ -111,16 +129,14 @@ impl State {
         // update all variables dependent on this variable
         self.camera_field_of_view = new_fov_radians.clamp(0.1, PI * 0.75);
         let camera_h = (self.camera_field_of_view / 2.).tan();
+        let w = Vec3::normalize(&(&self.look_from - &self.look_at));
+        let u = Vec3::normalize(&Vec3::cross(&self.vup, &w));
+        let v = Vec3::cross(&w, &u);
         self.viewport_height = 2. * camera_h;
         self.viewport_width = self.viewport_height * self.aspect_ratio;
-        self.viewport_horizontal_vec = Vec3(self.viewport_width, 0., 0.);
-        self.viewport_vertical_vec = Vec3(0., self.viewport_height, 0.);
-        self.focal_length = 1.;
-        self.lower_left_corner = Vec3(
-            self.camera_origin.x() - self.viewport_horizontal_vec.0 / 2.,
-            self.camera_origin.y() - self.viewport_vertical_vec.1 / 2.,
-            self.camera_origin.z() - self.focal_length,
-        );
+        self.horizontal = Vec3(self.viewport_width, 0., 0.) * u;
+        self.vertical = Vec3(0., self.viewport_height, 0.) * v;
+        self.lower_left_corner = &self.look_from - &self.horizontal / 2. - &self.vertical / 2. - w;
 
         // should render the new change
         self.should_render = true;
@@ -403,10 +419,8 @@ pub fn main() -> Result<(), JsValue> {
     let viewport_width_u_location = gl.get_uniform_location(&program, "u_viewport_width");
     let focal_length_u_location = gl.get_uniform_location(&program, "u_focal_length");
     let camera_origin_u_location = gl.get_uniform_location(&program, "u_camera_origin");
-    let viewport_horizontal_vec_u_location =
-        gl.get_uniform_location(&program, "u_viewport_horizontal_vec");
-    let viewport_vertical_vec_u_location =
-        gl.get_uniform_location(&program, "u_viewport_vertical_vec");
+    let horizontal_u_location = gl.get_uniform_location(&program, "u_horizontal");
+    let vertical_u_location = gl.get_uniform_location(&program, "u_vertical");
     let lower_left_corner_u_location = gl.get_uniform_location(&program, "u_lower_left_corner");
     let max_depth_u_location = gl.get_uniform_location(&program, "u_max_depth");
     let render_count_u_location = gl.get_uniform_location(&program, "u_render_count");
@@ -477,20 +491,17 @@ pub fn main() -> Result<(), JsValue> {
             gl.uniform1f(focal_length_u_location.as_ref(), state.focal_length as f32);
             gl.uniform3fv_with_f32_array(
                 camera_origin_u_location.as_ref(),
-                &state.camera_origin.to_array(),
+                &state.look_from.to_array(),
             );
             gl.uniform1f(
                 viewport_width_u_location.as_ref(),
                 state.viewport_width as f32,
             );
             gl.uniform3fv_with_f32_array(
-                viewport_horizontal_vec_u_location.as_ref(),
-                &state.viewport_horizontal_vec.to_array(),
+                horizontal_u_location.as_ref(),
+                &state.horizontal.to_array(),
             );
-            gl.uniform3fv_with_f32_array(
-                viewport_vertical_vec_u_location.as_ref(),
-                &state.viewport_vertical_vec.to_array(),
-            );
+            gl.uniform3fv_with_f32_array(vertical_u_location.as_ref(), &state.vertical.to_array());
             gl.uniform3fv_with_f32_array(
                 lower_left_corner_u_location.as_ref(),
                 &state.lower_left_corner.to_array(),

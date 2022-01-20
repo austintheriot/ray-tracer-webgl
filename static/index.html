@@ -73,8 +73,8 @@
         uniform float u_viewport_width;
         uniform float u_focal_length;
         uniform vec3 u_camera_origin;
-        uniform vec3 u_viewport_horizontal_vec;
-        uniform vec3 u_viewport_vertical_vec;
+        uniform vec3 u_horizontal;
+        uniform vec3 u_vertical;
         uniform vec3 u_lower_left_corner;
         uniform int u_max_depth;
         uniform float u_render_count;
@@ -305,7 +305,7 @@
                 vec2 randomized_uv = uv + random_within_pixel;
 
                 // create ray from camera origin to viewport
-                vec3 ray_direction = u_lower_left_corner + randomized_uv.x * u_viewport_horizontal_vec + randomized_uv.y * u_viewport_vertical_vec - u_camera_origin;
+                vec3 ray_direction = u_lower_left_corner + randomized_uv.x * u_horizontal + randomized_uv.y * u_vertical - u_camera_origin;
                 Ray r = Ray(u_camera_origin, ray_direction);
 
 
