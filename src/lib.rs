@@ -173,63 +173,40 @@ impl Default for State {
 }
 
 impl State {
-    fn set_fov(&mut self, new_fov_radians: f64) {
-        // update all variables dependent on this variable
-        let width = self.width;
-        let height = self.height;
-        let aspect_ratio = (width as f64) / (height as f64);
-        let camera_field_of_view = new_fov_radians.clamp(0.1, PI * 0.75);
-        let camera_h = (camera_field_of_view / 2.).tan();
-        let camera_origin = self.camera_origin.clone();
-        let look_at = &camera_origin + &self.camera_front;
-        let vup = self.vup.clone();
-        let w = Vec3::normalize(&camera_origin - &look_at);
-        let u = Vec3::normalize(Vec3::cross(&vup, &w));
+    // updates all "downstream" variables once a rendering/camera variable has been changed
+    fn update_pipeline(&mut self) {
+        self.aspect_ratio = (self.width as f64) / (self.height as f64);
+        let camera_h = (self.camera_field_of_view / 2.).tan();
+        self.camera_front = Point(
+            f64::cos(degrees_to_radians(self.yaw)) * f64::cos(degrees_to_radians(self.pitch)),
+            f64::sin(degrees_to_radians(self.pitch)),
+            f64::sin(degrees_to_radians(self.yaw)) * f64::cos(degrees_to_radians(self.pitch)),
+        );
+        let look_at = &self.camera_origin + &self.camera_front;
+        let w = Vec3::normalize(&self.camera_origin - &look_at);
+        let u = Vec3::normalize(Vec3::cross(&self.vup, &w));
         let v = Vec3::cross(&w, &u);
-        let viewport_height = 2. * camera_h;
-        let viewport_width = viewport_height * aspect_ratio;
-        let horizontal = viewport_width * u;
-        let vertical = viewport_height * v;
-        let lower_left_corner = &camera_origin - &horizontal / 2. - &vertical / 2. - w;
+        self.viewport_height = 2. * camera_h;
+        self.viewport_width = self.viewport_height * self.aspect_ratio;
+        self.horizontal = self.viewport_width * u;
+        self.vertical = self.viewport_height * v;
+        self.lower_left_corner =
+            &self.camera_origin - &self.horizontal / 2. - &self.vertical / 2. - w;
+    }
 
-        self.camera_field_of_view = camera_field_of_view;
-        self.vup = vup;
-        self.viewport_height = viewport_height;
-        self.viewport_width = viewport_width;
-        self.horizontal = horizontal;
-        self.vertical = vertical;
-        self.lower_left_corner = lower_left_corner;
+    fn set_fov(&mut self, new_fov_radians: f64) {
+        self.camera_field_of_view = new_fov_radians.clamp(0.1, PI * 0.75);
+        self.update_pipeline();
 
         // should render the new change
         self.render_count = 0;
         self.should_render = true;
     }
 
-    fn set_camera_front(&mut self, new_camera_front: Vec3) {
-        // recalculate "downstream" camera variables
-        let camera_front = new_camera_front;
-        let aspect_ratio = self.aspect_ratio;
-        let camera_field_of_view = self.camera_field_of_view;
-        let camera_h = (camera_field_of_view / 2.).tan();
-        let camera_origin = self.camera_origin.clone();
-        let look_at = &camera_origin + &self.camera_front;
-        let vup = self.vup.clone();
-        let w = Vec3::normalize(&camera_origin - &look_at);
-        let u = Vec3::normalize(Vec3::cross(&vup, &w));
-        let v = Vec3::cross(&w, &u);
-        let viewport_height = 2. * camera_h;
-        let viewport_width = viewport_height * aspect_ratio;
-        let horizontal = viewport_width * u;
-        let vertical = viewport_height * v;
-        let lower_left_corner = &camera_origin - &horizontal / 2. - &vertical / 2. - w;
-
-        self.camera_front = camera_front;
-        self.vup = vup;
-        self.viewport_height = viewport_height;
-        self.viewport_width = viewport_width;
-        self.horizontal = horizontal;
-        self.vertical = vertical;
-        self.lower_left_corner = lower_left_corner;
+    fn set_camera_angles(&mut self, yaw: f64, pitch: f64) {
+        self.yaw = yaw;
+        self.pitch = f64::clamp(pitch, -89., 89.);
+        self.update_pipeline();
 
         // should render the new change
         self.render_count = 0;
@@ -468,18 +445,9 @@ pub fn handle_mouse_move(e: MouseEvent) {
     let mut state = (*STATE).lock().unwrap();
     let dx = (e.movement_x() as f64) * state.look_sensitivity;
     let dy = -(e.movement_y() as f64) * state.look_sensitivity;
-
-    state.yaw += dx;
-    state.pitch += dy;
-    state.pitch = f64::clamp(state.pitch, -89., 89.);
-
-    let new_camera_front = Point(
-        f64::cos(degrees_to_radians(state.yaw)) * f64::cos(degrees_to_radians(state.pitch)),
-        f64::sin(degrees_to_radians(state.pitch)),
-        f64::sin(degrees_to_radians(state.yaw)) * f64::cos(degrees_to_radians(state.pitch)),
-    );
-
-    state.set_camera_front(new_camera_front);
+    let yaw = state.yaw + dx;
+    let pitch = state.pitch + dy;
+    state.set_camera_angles(yaw, pitch);
 }
 
 pub fn handle_save_image(_: MouseEvent) {
