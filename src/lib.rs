@@ -64,11 +64,11 @@ struct State {
     /// Used to alternate which framebuffer to render to
     even_odd_count: u32,
     /// Used for averaging previous frames together
-    render_count: f32,
+    render_count: u32,
     /// The weight of the last frame compared to the each frame before.
     last_frame_weight: f32,
     /// Limiting the counted renders allows creating a sliding average of frames
-    max_render_count: f32,
+    max_render_count: u32,
     prev_now: f64,
     prev_fps_update_time: f64,
     prev_fps: [f64; 50],
@@ -102,9 +102,9 @@ impl Default for State {
         let should_render = true;
         let should_save = false;
         let even_odd_count = 0;
-        let render_count = 0.;
+        let render_count = 0;
         let last_frame_weight = 1.;
-        let max_render_count = 5.;
+        let max_render_count = 5;
         let prev_now = 0.;
         let prev_fps_update_time = 0.;
         let prev_fps = [0.; 50];
@@ -157,6 +157,7 @@ impl State {
             &self.camera_origin - &self.horizontal / 2. - &self.vertical / 2. - w;
 
         // should render the new change
+        self.render_count = 0;
         self.should_render = true;
     }
 
@@ -176,6 +177,7 @@ impl State {
             &self.camera_origin - &self.horizontal / 2. - &self.vertical / 2. - w;
 
         // should render the new change
+        self.render_count = 0;
         self.should_render = true;
     }
 }
@@ -354,7 +356,7 @@ fn update_render_globals(state: &mut MutexGuard<State>) {
         state.should_render = false;
     }
     state.even_odd_count += 1;
-    state.render_count = (state.render_count + 1.).min(state.max_render_count);
+    state.render_count = (state.render_count + 1).min(state.max_render_count);
 }
 
 fn degrees_to_radians(degrees: f64) -> f64 {
@@ -603,7 +605,7 @@ pub fn main() -> Result<(), JsValue> {
                 lower_left_corner_u_location.as_ref(),
                 &state.lower_left_corner.to_array(),
             );
-            gl.uniform1f(render_count_u_location.as_ref(), state.render_count);
+            gl.uniform1i(render_count_u_location.as_ref(), state.render_count as i32);
             gl.uniform1i(
                 should_average_u_location.as_ref(),
                 state.should_average as i32,

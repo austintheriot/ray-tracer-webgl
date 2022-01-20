@@ -77,7 +77,7 @@
         uniform vec3 u_vertical;
         uniform vec3 u_lower_left_corner;
         uniform int u_max_depth;
-        uniform float u_render_count;
+        uniform int u_render_count;
         uniform bool u_should_average;
         uniform float u_last_frame_weight;
         
@@ -320,14 +320,15 @@
             color = sqrt(color);
         
             vec4 prev_frame = texture(u_texture, uv);
+            float render_count = float(u_render_count);
 
             if (u_should_average) {
                 // average this frame with previous frames
-                if (prev_frame.a == 0.) {
+                if (prev_frame.a == 0. || u_render_count == 0 || u_render_count == 1) {
                     o_color = vec4(color, 1.);
                 } else {
-                    float total_frames = u_render_count + u_last_frame_weight;
-                    vec3 merged_color = (prev_frame.rgb * u_render_count + color * u_last_frame_weight) / total_frames;
+                    float total_frames = render_count + u_last_frame_weight;
+                    vec3 merged_color = (prev_frame.rgb * render_count + color * u_last_frame_weight) / total_frames;
                     o_color = vec4(merged_color, 1.);
                 }
             } else {
