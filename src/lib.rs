@@ -17,12 +17,24 @@ use vec3::{Point, Vec3};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlParagraphElement;
+use web_sys::MouseEvent;
 use web_sys::{
-    HtmlAnchorElement, HtmlScriptElement, WebGl2RenderingContext, WebGlFramebuffer, WebGlProgram,
-    WebGlShader, WebGlTexture, WheelEvent,
+    HtmlAnchorElement, HtmlScriptElement, KeyboardEvent, WebGl2RenderingContext, WebGlFramebuffer,
+    WebGlProgram, WebGlShader, WebGlTexture, WheelEvent,
 };
 
 pub const BYTES_PER_PIXEL: u32 = 4;
+pub const LOOK_SENSITIVITY: f64 = 1.;
+
+#[derive(Default)]
+struct KeydownMap {
+    w: bool,
+    a: bool,
+    s: bool,
+    d: bool,
+    space: bool,
+    shift: bool,
+}
 
 struct State {
     width: u32,
@@ -31,8 +43,8 @@ struct State {
     samples_per_pixel: u32,
     max_depth: u32,
     focal_length: f64,
-    look_from: Point,
-    look_at: Point,
+    camera_origin: Point,
+    camera_front: Point,
     vup: Vec3,
     /// stored in radians
     camera_field_of_view: f64,
@@ -59,6 +71,7 @@ struct State {
     prev_now: f64,
     prev_fps_update_time: f64,
     prev_fps: [f64; 50],
+    keydown_map: KeydownMap,
 }
 
 impl Default for State {
@@ -68,10 +81,11 @@ impl Default for State {
         let aspect_ratio = (width as f64) / (height as f64);
         let camera_field_of_view = PI / 2.;
         let camera_h = (camera_field_of_view / 2.).tan();
-        let look_from = Point(0., 0., 0.);
-        let look_at = Point(0., 0., -1.);
+        let camera_origin = Point(0., 0., 0.);
+        let camera_front = Point(0., 0., -1.);
+        let look_at = &camera_origin + &camera_front;
         let vup = Vec3(0., 1., 0.);
-        let w = Vec3::normalize(&(&look_from - &look_at));
+        let w = Vec3::normalize(&(&camera_origin - &look_at));
         let u = Vec3::normalize(&Vec3::cross(&vup, &w));
         let v = Vec3::cross(&w, &u);
         let viewport_height = 2. * camera_h;
@@ -79,7 +93,7 @@ impl Default for State {
         let horizontal = viewport_width * u;
         let vertical = viewport_height * v;
         let focal_length = 1.;
-        let lower_left_corner = &look_from - &horizontal / 2. - &vertical / 2. - w;
+        let lower_left_corner = &camera_origin - &horizontal / 2. - &vertical / 2. - w;
 
         let samples_per_pixel = 1;
         let max_depth = 10;
@@ -101,8 +115,8 @@ impl Default for State {
             samples_per_pixel,
             max_depth,
             focal_length,
-            look_from,
-            look_at,
+            camera_origin,
+            camera_front,
             vup,
             camera_field_of_view,
             viewport_height,
@@ -120,6 +134,7 @@ impl Default for State {
             prev_now,
             prev_fps_update_time,
             prev_fps,
+            keydown_map: KeydownMap::default(),
         }
     }
 }
@@ -129,14 +144,16 @@ impl State {
         // update all variables dependent on this variable
         self.camera_field_of_view = new_fov_radians.clamp(0.1, PI * 0.75);
         let camera_h = (self.camera_field_of_view / 2.).tan();
-        let w = Vec3::normalize(&(&self.look_from - &self.look_at));
+        let look_at = &self.camera_origin + &self.camera_front;
+        let w = Vec3::normalize(&(&self.camera_origin - &look_at));
         let u = Vec3::normalize(&Vec3::cross(&self.vup, &w));
         let v = Vec3::cross(&w, &u);
         self.viewport_height = 2. * camera_h;
         self.viewport_width = self.viewport_height * self.aspect_ratio;
         self.horizontal = Vec3(self.viewport_width, 0., 0.) * u;
         self.vertical = Vec3(0., self.viewport_height, 0.) * v;
-        self.lower_left_corner = &self.look_from - &self.horizontal / 2. - &self.vertical / 2. - w;
+        self.lower_left_corner =
+            &self.camera_origin - &self.horizontal / 2. - &self.vertical / 2. - w;
 
         // should render the new change
         self.should_render = true;
@@ -324,7 +341,6 @@ fn degrees_to_radians(degrees: f64) -> f64 {
     (degrees * PI) / 180.
 }
 
-#[wasm_bindgen]
 pub fn increase_fov(degrees: f64) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
@@ -332,7 +348,6 @@ pub fn increase_fov(degrees: f64) {
     state.camera_field_of_view += radians;
 }
 
-#[wasm_bindgen]
 pub fn handle_wheel(e: WheelEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
@@ -340,6 +355,45 @@ pub fn handle_wheel(e: WheelEvent) {
     let radians = degrees_to_radians(adjustment);
     let new_value = state.camera_field_of_view + radians;
     state.set_fov(new_value);
+}
+
+pub fn handle_keydown(e: KeyboardEvent) {
+    // can take a mutex guard here, because it will never be called while render loop is running
+    let mut state = (*STATE).lock().unwrap();
+    match e.key().as_str() {
+        "w" => state.keydown_map.w = true,
+        "a" => state.keydown_map.a = true,
+        "s" => state.keydown_map.s = true,
+        "d" => state.keydown_map.d = true,
+        " " => state.keydown_map.space = true,
+        "Shift" => state.keydown_map.shift = true,
+        _ => {}
+    }
+}
+
+pub fn handle_keyup(e: KeyboardEvent) {
+    // can take a mutex guard here, because it will never be called while render loop is running
+    let mut state = (*STATE).lock().unwrap();
+    match e.key().as_str() {
+        "w" => state.keydown_map.w = true,
+        "a" => state.keydown_map.a = true,
+        "s" => state.keydown_map.s = true,
+        "d" => state.keydown_map.d = true,
+        " " => state.keydown_map.space = true,
+        "Shift" => state.keydown_map.shift = true,
+        _ => {}
+    }
+}
+
+pub fn handle_mouse_move(e: MouseEvent) {
+    let dx = e.movement_x();
+    let dy = e.movement_y();
+
+    // let newCameraFront: Vec3 = [0, 0, 0];
+    // newCameraFront[0] = Math.cos(degreesToRadians(yaw)) * Math.cos(degreesToRadians(pitch));
+    // newCameraFront[1] = Math.sin(degreesToRadians(pitch));
+    // newCameraFront[2] = Math.sin(degreesToRadians(yaw)) * Math.cos(degreesToRadians(pitch));
+    // cameraFront = normalizeVec3(newCameraFront);
 }
 
 #[wasm_bindgen]
@@ -386,6 +440,19 @@ pub fn main() -> Result<(), JsValue> {
     let handle_wheel = Closure::wrap(Box::new(handle_wheel) as Box<dyn FnMut(WheelEvent)>);
     window.set_onwheel(Some(handle_wheel.as_ref().unchecked_ref()));
     handle_wheel.forget();
+
+    let handle_keydown = Closure::wrap(Box::new(handle_keydown) as Box<dyn FnMut(KeyboardEvent)>);
+    window.set_onkeydown(Some(handle_keydown.as_ref().unchecked_ref()));
+    handle_keydown.forget();
+
+    let handle_keyup = Closure::wrap(Box::new(handle_keyup) as Box<dyn FnMut(KeyboardEvent)>);
+    window.set_onkeyup(Some(handle_keyup.as_ref().unchecked_ref()));
+    handle_keyup.forget();
+
+    let handle_mouse_move =
+        Closure::wrap(Box::new(handle_mouse_move) as Box<dyn FnMut(MouseEvent)>);
+    canvas.set_onmousemove(Some(handle_mouse_move.as_ref().unchecked_ref()));
+    handle_mouse_move.forget();
 
     //  SETUP PROGRAM
     let vertex_shader = {
@@ -491,7 +558,7 @@ pub fn main() -> Result<(), JsValue> {
             gl.uniform1f(focal_length_u_location.as_ref(), state.focal_length as f32);
             gl.uniform3fv_with_f32_array(
                 camera_origin_u_location.as_ref(),
-                &state.look_from.to_array(),
+                &state.camera_origin.to_array(),
             );
             gl.uniform1f(
                 viewport_width_u_location.as_ref(),

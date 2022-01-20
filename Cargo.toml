@@ -40,5 +40,6 @@ features = [
   'WebGlTexture',
   'HtmlAnchorElement',
   'HtmlParagraphElement',
-  'WheelEvent'
+  'WheelEvent',
+  'KeyboardEvent'
 ]
