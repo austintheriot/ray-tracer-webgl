@@ -1,5 +1,4 @@
 - Enable velocity
-- Debounce window resize function to help with performance
 - Only run update_pipeline once before actually rendering
 - Limit aspect ratio of window? (to prevent performance issues on very large screens)
 - Enable collision detection for camera (to prevent moving into bodies on accident)

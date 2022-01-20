@@ -89,6 +89,7 @@ struct State {
     prev_now: f64,
     /// this is necessary after the user resizes their viewport
     should_update_to_match_window_size: bool,
+    last_resize_time: f64,
 
     // MOVEMENT
     keydown_map: KeydownMap,
@@ -136,7 +137,8 @@ impl Default for State {
         let last_frame_weight = 1.;
         let max_render_count = 100_000;
         let prev_now = 0.;
-        let should_resize = false;
+        let should_update_to_match_window_size = false;
+        let last_resize_time = 0.;
 
         let is_paused = true;
 
@@ -174,7 +176,8 @@ impl Default for State {
             last_frame_weight,
             max_render_count,
             prev_now,
-            should_update_to_match_window_size: should_resize,
+            should_update_to_match_window_size,
+            last_resize_time,
 
             prev_fps_update_time,
             prev_fps,
@@ -388,8 +391,10 @@ fn update_render_dimensions_to_match_window(
     gl: &WebGl2RenderingContext,
     textures: &[WebGlTexture; 2],
     canvas: &HtmlCanvasElement,
+    now: f64,
 ) {
     // update state
+    state.last_resize_time = now;
     state.width = window().inner_width().unwrap().as_f64().unwrap() as u32;
     state.height = window().inner_height().unwrap().as_f64().unwrap() as u32;
     state.update_pipeline();
@@ -738,9 +743,9 @@ pub fn main() -> Result<(), JsValue> {
         // since it is synchronous and no other function calls can
         // try to lock the mutex while it is in use
         let mut state = (*STATE).lock().unwrap();
-
         let now = window.performance().unwrap().now();
         let dt = now - state.prev_now;
+
         update_position(&mut state, dt);
 
         // don't render while paused unless trying to save
@@ -752,10 +757,19 @@ pub fn main() -> Result<(), JsValue> {
                 && !state.should_save
                 && state.render_count == 0);
 
-        if state.should_update_to_match_window_size {
+        // debounce resize handler
+        if state.should_update_to_match_window_size && now - state.last_resize_time > 500. {
             state.should_update_to_match_window_size = false;
-            update_render_dimensions_to_match_window(&mut state, &gl, &textures, &canvas);
+            update_render_dimensions_to_match_window(&mut state, &gl, &textures, &canvas, now);
         }
+
+        // increase sample rate when paused (such as on first render and when resizing)
+        // it's ok to do some heavy lifting here, since it's not being continually rendered at this output
+        let samples_per_pixel = if state.is_paused {
+            state.samples_per_pixel.max(25)
+        } else {
+            state.samples_per_pixel
+        };
 
         if should_render {
             update_render_globals(&mut state);
@@ -769,7 +783,7 @@ pub fn main() -> Result<(), JsValue> {
             gl.uniform1f(time_u_location.as_ref(), now as f32);
             gl.uniform1i(
                 samples_per_pixel_u_location.as_ref(),
-                state.samples_per_pixel as i32,
+                samples_per_pixel as i32,
             );
             gl.uniform1f(aspect_ratio_u_location.as_ref(), state.aspect_ratio as f32);
             gl.uniform1f(
