@@ -221,6 +221,7 @@
 
                 // shoot ray off in random direction again
                 vec3 scatter_direction = hit_record.normal + random_unit_vec();
+                
                 // scatter direction can become close to 0 if opposite the normal vector 
                 // (which can cause infinities later on)
                 if (near_zero(scatter_direction)) {
@@ -238,9 +239,9 @@
 
                 // reflect ray off the surface
                 vec3 reflected_direction = reflect(r.direction, hit_record.normal);
+
                 // add in "fuzz" (optional)
-                vec3 fuzz = random_unit_vec() * hit_record.material.fuzz; 
-                vec3 fuzzed_direction = reflected_direction + fuzz;
+                vec3 fuzzed_direction = reflected_direction + hit_record.material.fuzz * random_in_unit_sphere();
                 scattered_ray = Ray(hit_record.hit_point, fuzzed_direction);
 
                 // count any rays that are reflected below the surface as  "absorbed"
