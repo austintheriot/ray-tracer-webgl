@@ -6,6 +6,7 @@ extern crate lazy_static;
 mod math;
 mod vec3;
 
+use log::info;
 use std::cell::RefCell;
 use std::f64::consts::PI;
 use std::rc::Rc;
@@ -16,6 +17,7 @@ use vec3::{Point, Vec3};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::Element;
+use web_sys::HtmlCanvasElement;
 use web_sys::HtmlParagraphElement;
 use web_sys::MouseEvent;
 use web_sys::{
@@ -85,6 +87,8 @@ struct State {
     max_render_count: u32,
     /// Used for calculating time delta in animation loop
     prev_now: f64,
+    /// this is necessary after the user resizes their viewport
+    should_update_to_match_window_size: bool,
 
     // MOVEMENT
     keydown_map: KeydownMap,
@@ -97,8 +101,8 @@ struct State {
 
 impl Default for State {
     fn default() -> Self {
-        let width = 1200;
-        let height = 900;
+        let width = window().inner_width().unwrap().as_f64().unwrap() as u32;
+        let height = window().inner_height().unwrap().as_f64().unwrap() as u32;
         let aspect_ratio = (width as f64) / (height as f64);
         let camera_field_of_view = PI / 2.;
         let camera_h = (camera_field_of_view / 2.).tan();
@@ -132,6 +136,7 @@ impl Default for State {
         let last_frame_weight = 1.;
         let max_render_count = 100_000;
         let prev_now = 0.;
+        let should_resize = false;
 
         let is_paused = true;
 
@@ -169,6 +174,7 @@ impl Default for State {
             last_frame_weight,
             max_render_count,
             prev_now,
+            should_update_to_match_window_size: should_resize,
 
             prev_fps_update_time,
             prev_fps,
@@ -377,6 +383,41 @@ fn update_fps_indicator(p: &HtmlParagraphElement, now: f64, state: &mut MutexGua
     }
 }
 
+fn update_render_dimensions_to_match_window(
+    state: &mut MutexGuard<State>,
+    gl: &WebGl2RenderingContext,
+    textures: &[WebGlTexture; 2],
+    canvas: &HtmlCanvasElement,
+) {
+    // update state
+    state.width = window().inner_width().unwrap().as_f64().unwrap() as u32;
+    state.height = window().inner_height().unwrap().as_f64().unwrap() as u32;
+    state.update_pipeline();
+
+    // sync width/height-dependent objects with state
+    canvas.set_width(state.width);
+    canvas.set_height(state.height);
+    gl.viewport(0, 0, state.width as i32, state.height as i32);
+    for texture in textures.iter() {
+        gl.bind_texture(WebGl2RenderingContext::TEXTURE_2D, Some(&texture));
+        // load empty texture into gpu -- this will get rendered into later
+        gl.tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and_opt_u8_array(
+            WebGl2RenderingContext::TEXTURE_2D,
+            0,
+            WebGl2RenderingContext::RGBA as i32,
+            state.width as i32,
+            state.height as i32,
+            0,
+            WebGl2RenderingContext::RGBA,
+            WebGl2RenderingContext::UNSIGNED_BYTE,
+            None,
+        )
+        .unwrap();
+    }
+
+    info!("after {} {}", state.width, state.height);
+}
+
 fn update_moving_fps_array(now: f64, state: &mut MutexGuard<State>, dt: f64) {
     // calculate moving fps
     state.prev_now = now;
@@ -461,6 +502,12 @@ pub fn handle_keydown(e: KeyboardEvent) {
     }
 }
 
+pub fn handle_resize() {
+    // can take a mutex guard here, because it will never be called while render loop is running
+    let mut state = (*STATE).lock().unwrap();
+    state.should_update_to_match_window_size = true;
+}
+
 pub fn handle_keyup(e: KeyboardEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
@@ -543,6 +590,10 @@ pub fn main() -> Result<(), JsValue> {
     let handle_wheel = Closure::wrap(Box::new(handle_wheel) as Box<dyn FnMut(WheelEvent)>);
     window.set_onwheel(Some(handle_wheel.as_ref().unchecked_ref()));
     handle_wheel.forget();
+
+    let handle_resize = Closure::wrap(Box::new(handle_resize) as Box<dyn FnMut()>);
+    window.set_onresize(Some(handle_resize.as_ref().unchecked_ref()));
+    handle_resize.forget();
 
     let handle_save_image =
         Closure::wrap(Box::new(handle_save_image) as Box<dyn FnMut(MouseEvent)>);
@@ -685,6 +736,11 @@ pub fn main() -> Result<(), JsValue> {
                 && state.is_paused
                 && !state.should_save
                 && state.render_count == 0);
+
+        if state.should_update_to_match_window_size {
+            state.should_update_to_match_window_size = false;
+            update_render_dimensions_to_match_window(&mut state, &gl, &textures, &canvas);
+        }
 
         if should_render {
             update_render_globals(&mut state);

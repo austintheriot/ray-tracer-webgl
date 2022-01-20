@@ -13,8 +13,6 @@ body {
 
 canvas {
   width: 100%;
-  max-width: min(100vw, 1200px);
-  max-height: 100vh;
   object-fit: contain;
 }
 
@@ -37,26 +35,10 @@ button {
   }
 }
 
-.container {
-  position: relative;
-  width: 100%;
-  max-width: 100vw;
-  max-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.controls {
+#fps {
   position: absolute;
   top: 1rem;
   left: 1rem;
-  display: flex;
-  flex-direction: column;
-
-  #save {
-    margin-bottom: 1rem;
-  }
 }
 
 #backdrop {
