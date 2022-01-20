@@ -448,14 +448,11 @@ pub fn handle_mouse_move(e: MouseEvent) {
     state.set_camera_front(new_camera_front);
 }
 
-#[wasm_bindgen]
-pub fn save_image() -> Result<(), JsValue> {
+pub fn handle_save_image(_: MouseEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
     state.should_render = true;
     state.should_save = true;
-
-    Ok(())
 }
 
 /// Entry function cannot be async, so spawns a local Future for running the real main function
@@ -488,6 +485,11 @@ pub fn main() -> Result<(), JsValue> {
         .unwrap()
         .dyn_into::<HtmlButtonElement>()?;
 
+    let save_image_button = document
+        .query_selector("#save-image")?
+        .unwrap()
+        .dyn_into::<HtmlButtonElement>()?;
+
     let backdrop = document
         .query_selector("#backdrop")?
         .unwrap()
@@ -504,6 +506,11 @@ pub fn main() -> Result<(), JsValue> {
     let handle_wheel = Closure::wrap(Box::new(handle_wheel) as Box<dyn FnMut(WheelEvent)>);
     window.set_onwheel(Some(handle_wheel.as_ref().unchecked_ref()));
     handle_wheel.forget();
+
+    let handle_save_image =
+        Closure::wrap(Box::new(handle_save_image) as Box<dyn FnMut(MouseEvent)>);
+    save_image_button.set_onclick(Some(handle_save_image.as_ref().unchecked_ref()));
+    handle_save_image.forget();
 
     let handle_keydown = Closure::wrap(Box::new(handle_keydown) as Box<dyn FnMut(KeyboardEvent)>);
     window.set_onkeydown(Some(handle_keydown.as_ref().unchecked_ref()));
