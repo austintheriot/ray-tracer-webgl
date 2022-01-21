@@ -6,6 +6,7 @@ extern crate lazy_static;
 mod math;
 mod vec3;
 
+use futures::try_join;
 use log::info;
 use std::cell::RefCell;
 use std::f64::consts::PI;
@@ -16,12 +17,14 @@ use std::sync::MutexGuard;
 use vec3::{Point, Vec3};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen_futures::JsFuture;
 use web_sys::Element;
 use web_sys::HtmlCanvasElement;
 use web_sys::HtmlParagraphElement;
 use web_sys::MouseEvent;
 use web_sys::{
-    Event, HtmlAnchorElement, HtmlButtonElement, HtmlDivElement, HtmlScriptElement, KeyboardEvent,
+    Event, HtmlAnchorElement, HtmlButtonElement, HtmlDivElement, KeyboardEvent, Request, Response,
     WebGl2RenderingContext, WebGlFramebuffer, WebGlProgram, WebGlShader, WebGlTexture, WheelEvent,
 };
 
@@ -548,13 +551,24 @@ pub fn handle_save_image(_: MouseEvent) {
     state.should_save = true;
 }
 
-/// Entry function cannot be async, so spawns a local Future for running the real main function
-#[wasm_bindgen]
-pub fn main() -> Result<(), JsValue> {
-    // enables ore helpful stack traces
-    console_error_panic_hook::set_once();
-    wasm_logger::init(wasm_logger::Config::default());
+pub async fn fetch_shader(url: &str) -> Result<String, JsValue> {
+    let request = Request::new_with_str(url)?;
+    let resp_value = JsFuture::from(window().fetch_with_request(&request)).await?;
 
+    // `resp_value` is a `Response` object.
+    assert!(resp_value.is_instance_of::<Response>());
+    let resp: Response = resp_value.dyn_into()?;
+
+    // Convert this other `Promise` into a rust `Future`.
+    let text = JsFuture::from(resp.text()?)
+        .await?
+        .as_string()
+        .ok_or("Couldn't convert shader source into String")?;
+
+    Ok(text)
+}
+
+pub async fn async_main() -> Result<(), JsValue> {
     // GET ELEMENTS
     let window = window();
     let document = document();
@@ -662,22 +676,14 @@ pub fn main() -> Result<(), JsValue> {
     handle_mouse_move.forget();
 
     //  SETUP PROGRAM
-    let vertex_shader = {
-        let shader_source = &document
-            .query_selector("#vertex-shader")?
-            .unwrap()
-            .dyn_into::<HtmlScriptElement>()?
-            .text()?;
-        compile_shader(&gl, WebGl2RenderingContext::VERTEX_SHADER, shader_source).unwrap()
-    };
-    let fragment_shader = {
-        let shader_source = &document
-            .query_selector("#fragment-shader")?
-            .unwrap()
-            .dyn_into::<HtmlScriptElement>()?
-            .text()?;
-        compile_shader(&gl, WebGl2RenderingContext::FRAGMENT_SHADER, shader_source).unwrap()
-    };
+    let (fragment_source, vertex_source) =
+        try_join!(fetch_shader("./shader.frag"), fetch_shader("./shader.vert"))?;
+    let vertex_shader = compile_shader(&gl, WebGl2RenderingContext::VERTEX_SHADER, &vertex_source)?;
+    let fragment_shader = compile_shader(
+        &gl,
+        WebGl2RenderingContext::FRAGMENT_SHADER,
+        &fragment_source,
+    )?;
     let program = link_program(&gl, &vertex_shader, &fragment_shader)?;
     gl.use_program(Some(&program));
 
@@ -862,6 +868,20 @@ pub fn main() -> Result<(), JsValue> {
     }) as Box<dyn FnMut()>));
 
     request_animation_frame((*g).borrow().as_ref().unwrap());
+
+    Ok(())
+}
+
+/// Entry function cannot be async, so spawns a local Future for running the real main function
+#[wasm_bindgen]
+pub fn main() -> Result<(), JsValue> {
+    // enables more helpful stack traces
+    console_error_panic_hook::set_once();
+    wasm_logger::init(wasm_logger::Config::default());
+
+    spawn_local(async {
+        async_main().await.unwrap_throw();
+    });
 
     Ok(())
 }

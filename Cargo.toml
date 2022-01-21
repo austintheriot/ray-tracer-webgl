@@ -18,6 +18,8 @@ wee_alloc = { version = "0.4.4", optional = true }
 js-sys = "0.3.55"
 console_error_panic_hook = "0.1.7"
 lazy_static = "1.4.0"
+wasm-bindgen-futures = "0.4.29"
+futures = "0.3.19"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
@@ -33,7 +35,6 @@ features = [
   'WebGlProgram',
   'WebGlShader',
   'Window',
-  'HtmlScriptElement',
   'WebGlUniformLocation',
   'Performance',
   'WebGlFramebuffer',
@@ -45,4 +46,6 @@ features = [
   'HtmlButtonElement',
   'DomTokenList',
   'HtmlDivElement',
+  'Request',
+  'Response',
 ]
