@@ -114,7 +114,7 @@ impl Default for State {
         let width = window().inner_width().unwrap().as_f64().unwrap() as u32;
         let height = window().inner_height().unwrap().as_f64().unwrap() as u32;
         let aspect_ratio = (width as f64) / (height as f64);
-        let aperture = 0.1;
+        let aperture = 0.;
         let focus_distance = 0.75;
         let lens_radius = aperture / 2.0;
 
