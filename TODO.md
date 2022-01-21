@@ -1,3 +1,5 @@
+- Add comments/clarify glsl code
+- Add loading indicator while fetching/compiling shader code
 - Enable setting geometry from Rust side
 - Enable focal distance (increase aperture size), and have camera automatically focus whatever is immediately in sight
 - Cleanup the data structures around setting uniforms and also adding ui listeners, etc.

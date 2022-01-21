@@ -112,7 +112,6 @@ vec3 random_in_unit_sphere() {
   return r * vec3(sqrt(1. - h.x * h.x) * vec2(sin(phi), cos(phi)), h.x);
 }
 
-// generate random 3d point in unit circle, with z = 0.
 vec2 random_in_unit_circle() {
   float a = hash1(global_seed) * 2. * PI;
   float r = sqrt(hash1(global_seed));
@@ -337,11 +336,15 @@ vec3 ray_color(in Ray r) {
 }
 
 // create ray from camera origin to viewport
-Ray get_camera_ray(in vec2 st) {
+Ray get_ray_from_camera(in vec2 st) {
+  // adding a camera lens offset allows simulating a depth of field effect
   vec2 random_point_on_camera_lens = u_lens_radius * random_in_unit_circle();
-  vec3 offset = u_u * random_point_on_camera_lens.x + u_v * random_point_on_camera_lens.y;
-  vec3 ray_direction = u_lower_left_corner + st.s * u_horizontal + st.t * u_vertical - u_camera_origin - offset;
-  return Ray(u_camera_origin + offset, ray_direction);
+  vec3 viewport_offset = u_u * random_point_on_camera_lens.x + u_v * random_point_on_camera_lens.y;
+
+  // direction from camera origin to the viewport
+  vec3 ray_direction = u_lower_left_corner + st.s * u_horizontal + st.t * u_vertical - u_camera_origin - viewport_offset;
+
+  return Ray(u_camera_origin + viewport_offset, ray_direction);
 }
 
 void main() {
@@ -356,12 +359,11 @@ void main() {
   vec3 color = vec3(0.);
   for(int i = 0; i < u_samples_per_pixel; i++) {
     vec2 random = hash2(global_seed);
-    vec2 random_from_0_to_1 = (random * 0.5) + 1.0;
-    vec2 random_within_pixel = random_from_0_to_1 / vec2(u_width, u_height);
+    vec2 random_within_pixel = random / vec2(u_width, u_height);
 
-    // uv +/- the value of 1 pixel
+    // pixel coordinate +/- the value of 1 pixel
     vec2 randomized_st = st + random_within_pixel;
-    Ray r = get_camera_ray(randomized_st);
+    Ray r = get_ray_from_camera(randomized_st);
 
     color += ray_color(r);
   }
