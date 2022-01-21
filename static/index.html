@@ -94,10 +94,11 @@
         struct Material {
             // 0 = Diffuse
             // 1 = Metal
+            // 2 = glass
             int type;
             vec3 albedo; // or "reflectance"
-            float fuzz;
-            float refraction_index;
+            float fuzz; // used for duller metals
+            float refraction_index; // used for glass
         };
 
         struct Sphere {
