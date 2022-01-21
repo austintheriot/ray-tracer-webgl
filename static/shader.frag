@@ -279,6 +279,14 @@ bool scatter(in Ray r, in HitRecord hit_record, out vec3 attenuation, out Ray sc
   return false;
 }
 
+// default background color when no intersection color was found
+vec3 background(in Ray r) {
+  vec3 unit_direction = normalize(r.direction);
+  float t = 0.5 * (unit_direction.y + 1.0);
+  vec3 gradient = mix(vec3(1.0, 1.0, 1.0), vec3(0.5, 0.7, 1.0), t);
+  return gradient;
+}
+
 // determine the color that a ray should be
 vec3 ray_color(in Ray r) {
   vec3 color = vec3(1.);
@@ -301,10 +309,8 @@ vec3 ray_color(in Ray r) {
 
     } else {
         // no hit, return the sky gradient background
-      vec3 unit_direction = normalize(r.direction);
-      float t = 0.5 * (unit_direction.y + 1.0);
-      vec3 gradient = mix(vec3(1.0, 1.0, 1.0), vec3(0.5, 0.7, 1.0), t);
-      return color * gradient;
+      vec3 background_gradient = background(r);
+      return color * background_gradient;
     }
   }
 
