@@ -12,6 +12,12 @@ uint base_hash(uvec2 p) {
   return h32 ^ (h32 >> 16);
 }
 
+float hash1(inout float seed)
+{
+    uint n = base_hash(floatBitsToUint(vec2(seed += .1, seed += .1)));
+    return float(n)*(1.0/float(0xffffffffU));
+}
+
 vec2 hash2(inout float seed) {
   uint n = base_hash(floatBitsToUint(vec2(seed += .1, seed += .1)));
   uvec2 rz = uvec2(n, n * 48271U);
@@ -47,6 +53,10 @@ uniform int u_max_depth;
 uniform int u_render_count;
 uniform bool u_should_average;
 uniform float u_last_frame_weight;
+uniform float u_lens_radius;
+uniform vec3 u_u;
+uniform vec3 u_v;
+uniform vec3 u_w;
 
 // STRUCTS //////////////////////////////////////////////////////
 struct Ray {
@@ -100,6 +110,15 @@ vec3 random_in_unit_sphere() {
   float phi = h.y;
   float r = pow(h.z, 1. / 3.);
   return r * vec3(sqrt(1. - h.x * h.x) * vec2(sin(phi), cos(phi)), h.x);
+}
+
+// generate random 3d point in unit circle, with z = 0.
+vec2 random_in_unit_circle() {
+  float a = hash1(global_seed) * 2. * PI;
+  float r = sqrt(hash1(global_seed));
+  float x = r * cos(a);
+  float y = r * sin(a);
+  return vec2(x, y);
 }
 
 vec3 random_unit_vec() {
@@ -258,7 +277,7 @@ bool scatter(in Ray r, in HitRecord hit_record, out vec3 attenuation, out Ray sc
     // there is a random chance of the ray reflecting
     // --chance increases as reflectance approximation increases
     float reflectance_amount = reflectance(cos_theta, refraction_ratio);
-    float random_float = hash2(global_seed).x;
+    float random_float = hash1(global_seed);
 
     // when the ray cannot refract (or when it's reflectance 
     // approximation is high), it reflects instead
@@ -317,13 +336,21 @@ vec3 ray_color(in Ray r) {
   return color;
 }
 
+// create ray from camera origin to viewport
+Ray get_camera_ray(in vec2 st) {
+  vec2 random_point_on_camera_lens = u_lens_radius * random_in_unit_circle();
+  vec3 offset = u_u * random_point_on_camera_lens.x + u_v * random_point_on_camera_lens.y;
+  vec3 ray_direction = u_lower_left_corner + st.s * u_horizontal + st.t * u_vertical - u_camera_origin - offset;
+  return Ray(u_camera_origin + offset, ray_direction);
+}
+
 void main() {
   // this seed initialization is by reinder https://www.shadertoy.com/view/llVcDz
   global_seed = float(base_hash(floatBitsToUint(v_position))) / float(0xffffffffU) + u_time;
 
   // get current position on viewport, mapped from -1->1 to 0->1
   // (i.e. percentage of width, percentage of height)
-  vec2 uv = (v_position + 1.) * 0.5;
+  vec2 st = (v_position + 1.) * 0.5;
 
   // accumulate color per pixel
   vec3 color = vec3(0.);
@@ -333,11 +360,8 @@ void main() {
     vec2 random_within_pixel = random_from_0_to_1 / vec2(u_width, u_height);
 
     // uv +/- the value of 1 pixel
-    vec2 randomized_uv = uv + random_within_pixel;
-
-    // create ray from camera origin to viewport
-    vec3 ray_direction = u_lower_left_corner + randomized_uv.x * u_horizontal + randomized_uv.y * u_vertical - u_camera_origin;
-    Ray r = Ray(u_camera_origin, ray_direction);
+    vec2 randomized_st = st + random_within_pixel;
+    Ray r = get_camera_ray(randomized_st);
 
     color += ray_color(r);
   }
@@ -349,7 +373,7 @@ void main() {
   // gamma correction
   color = sqrt(color);
 
-  vec4 prev_frame = texture(u_texture, uv);
+  vec4 prev_frame = texture(u_texture, st);
   float render_count = float(u_render_count);
 
   if (u_should_average) {

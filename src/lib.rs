@@ -64,6 +64,12 @@ struct State {
     vup: Vec3,
     /// stored in radians
     camera_field_of_view: f64,
+    u: Vec3,
+    v: Vec3,
+    w: Vec3,
+    aperture: f64,
+    lens_radius: f64,
+    focus_distance: f64,
     viewport_height: f64,
     viewport_width: f64,
     horizontal: Vec3,
@@ -108,6 +114,10 @@ impl Default for State {
         let width = window().inner_width().unwrap().as_f64().unwrap() as u32;
         let height = window().inner_height().unwrap().as_f64().unwrap() as u32;
         let aspect_ratio = (width as f64) / (height as f64);
+        let aperture = 0.1;
+        let focus_distance = 0.75;
+        let lens_radius = aperture / 2.0;
+
         let camera_field_of_view = PI / 2.;
         let camera_h = (camera_field_of_view / 2.).tan();
         let camera_origin = Point(0., 0., 0.);
@@ -125,10 +135,11 @@ impl Default for State {
         let v = Vec3::cross(&w, &u);
         let viewport_height = 2. * camera_h;
         let viewport_width = viewport_height * aspect_ratio;
-        let horizontal = viewport_width * u;
-        let vertical = viewport_height * v;
+        let horizontal = focus_distance * viewport_width * &u;
+        let vertical = focus_distance * viewport_height * &v;
         let focal_length = 1.;
-        let lower_left_corner = &camera_origin - &horizontal / 2. - &vertical / 2. - w;
+        let lower_left_corner =
+            &camera_origin - &horizontal / 2. - &vertical / 2. - focus_distance * &w;
 
         let samples_per_pixel = 1;
         let max_depth = 10;
@@ -154,6 +165,12 @@ impl Default for State {
         State {
             width,
             height,
+            aperture,
+            u,
+            v,
+            w,
+            focus_distance,
+            lens_radius,
             aspect_ratio,
             samples_per_pixel,
             max_depth,
@@ -205,15 +222,17 @@ impl State {
             f64::sin(degrees_to_radians(self.yaw)) * f64::cos(degrees_to_radians(self.pitch)),
         );
         let look_at = &self.camera_origin + &self.camera_front;
-        let w = Vec3::normalize(&self.camera_origin - &look_at);
-        let u = Vec3::normalize(Vec3::cross(&self.vup, &w));
-        let v = Vec3::cross(&w, &u);
+        self.w = Vec3::normalize(&self.camera_origin - &look_at);
+        self.u = Vec3::normalize(Vec3::cross(&self.vup, &self.w));
+        self.v = Vec3::cross(&self.w, &self.u);
         self.viewport_height = 2. * camera_h;
         self.viewport_width = self.viewport_height * self.aspect_ratio;
-        self.horizontal = self.viewport_width * u;
-        self.vertical = self.viewport_height * v;
-        self.lower_left_corner =
-            &self.camera_origin - &self.horizontal / 2. - &self.vertical / 2. - w;
+        self.horizontal = self.focus_distance * self.viewport_width * &self.u;
+        self.vertical = self.focus_distance * self.viewport_height * &self.v;
+        self.lower_left_corner = &self.camera_origin
+            - &self.horizontal / 2.
+            - &self.vertical / 2.
+            - self.focus_distance * &self.w;
 
         if self != &prev_state {
             self.render_count = 0;
@@ -706,6 +725,10 @@ pub async fn async_main() -> Result<(), JsValue> {
     let render_count_u_location = gl.get_uniform_location(&program, "u_render_count");
     let should_average_u_location = gl.get_uniform_location(&program, "u_should_average");
     let last_frame_weight_u_location = gl.get_uniform_location(&program, "u_last_frame_weight");
+    let lens_radius_u_location = gl.get_uniform_location(&program, "u_lens_radius");
+    let u_u_location = gl.get_uniform_location(&program, "u_u");
+    let v_u_location = gl.get_uniform_location(&program, "u_v");
+    let w_u_location = gl.get_uniform_location(&program, "u_w");
 
     // SET VERTEX BUFFER
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
@@ -821,6 +844,10 @@ pub async fn async_main() -> Result<(), JsValue> {
                 last_frame_weight_u_location.as_ref(),
                 state.last_frame_weight as f32,
             );
+            gl.uniform1f(lens_radius_u_location.as_ref(), state.lens_radius as f32);
+            gl.uniform3fv_with_f32_array(u_u_location.as_ref(), &state.u.to_array());
+            gl.uniform3fv_with_f32_array(v_u_location.as_ref(), &state.v.to_array());
+            gl.uniform3fv_with_f32_array(w_u_location.as_ref(), &state.w.to_array());
 
             // RENDER
             // use texture previously rendered to
@@ -880,7 +907,7 @@ pub fn main() -> Result<(), JsValue> {
     wasm_logger::init(wasm_logger::Config::default());
 
     spawn_local(async {
-        async_main().await.unwrap_throw();
+        async_main().await.unwrap();
     });
 
     Ok(())
