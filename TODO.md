@@ -1,7 +1,10 @@
 - Add comments/clarify glsl code
 - Add loading indicator while fetching/compiling shader code
 - Enable setting geometry from Rust side
+  - Uniform buffer object?
+- Enable mobile viewers to view
 - Enable focal distance (increase aperture size), and have camera automatically focus whatever is immediately in sight
+  - This will probably involve doing a single CPU ray-cast through the center of the canvas to find the first object that is hit
 - Cleanup the data structures around setting uniforms and also adding ui listeners, etc.
 - Enable velocity
 - Only run update_pipeline once before actually rendering
