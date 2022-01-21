@@ -97,6 +97,7 @@
             int type;
             vec3 albedo; // or "reflectance"
             float fuzz;
+            float refraction_index;
         };
 
         struct Sphere {
@@ -152,6 +153,13 @@
             }
         }
 
+        vec3 refract(in vec3 uv, in vec3 normal, float eta_i_over_eta_t) {
+            float cos_theta = min(dot(-uv, normal), 1.);
+            vec3 r_out_perp =  eta_i_over_eta_t * (uv + cos_theta * normal);
+            vec3 r_out_parallel = -sqrt(abs(1.0 - length_squared(r_out_perp))) * normal;
+            return r_out_perp + r_out_parallel;
+        }
+
         bool hit_sphere(in Sphere sphere, in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
             vec3 oc = r.origin - sphere.center;
             float a = length_squared(r.direction);
@@ -182,11 +190,11 @@
 
         bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
             // compose the scene (hardcoded for now)
-            Sphere ground =  Sphere(vec3(0., -100.5, -1.),  100., Material(0, vec3(0.75, 0.6, 0.5), 0.));
-            Sphere center = Sphere(vec3(0., 0., -1.), 0.5, Material(0, vec3(0.3, 0.3, 0.4), 0.));
-            Sphere left = Sphere(vec3(-1., 0., -1.), 0.5, Material(1, vec3(1., 1., 1.), 0.));
-            Sphere left_small = Sphere(vec3(-0.45, -0.4, -0.7), 0.1, Material(1, vec3(1., 1., 1.), 0.));
-            Sphere right = Sphere(vec3(1., 0., -1.), 0.5, Material(1, vec3(1., 1., 1.), 0.5));
+            Sphere ground =  Sphere(vec3(0., -100.5, -1.),  100., Material(0, vec3(0.75, 0.6, 0.5), 0., 0.));
+            Sphere center = Sphere(vec3(0., 0., -1.), 0.5, Material(0, vec3(0.3, 0.3, 0.4), 0., 0.));
+            Sphere left = Sphere(vec3(-1., 0., -1.), 0.5, Material(2, vec3(1., 1., 1.), 0., 1.5));
+            Sphere left_small = Sphere(vec3(-0.45, -0.4, -0.7), 0.1, Material(1, vec3(1., 1., 1.), 0., 0.));
+            Sphere right = Sphere(vec3(1., 0., -1.), 0.5, Material(1, vec3(1., 1., 1.), 0.5, 0.));
             Sphere sphere_list[] = Sphere[5](center, left, left_small, right, ground);
             
             // test whether any geometry was hit. If it was, the hit_record will be updated with
@@ -252,6 +260,23 @@
                 bool reflected_above_surface = dot(hit_record.normal, fuzzed_direction) > 0.;
 
                 return reflected_above_surface;
+            } 
+
+             // 2 = glass
+             if (hit_record.material.type == 2) {
+                // color attenuation on reflection
+                attenuation = hit_record.material.albedo;
+
+                float refraction_ratio = hit_record.front_face 
+                    ? (1.0 / hit_record.material.refraction_index) 
+                    : hit_record.material.refraction_index;
+                
+                vec3 unit_direction = normalize(r.direction);
+                vec3 refracted = refract(unit_direction, hit_record.normal, refraction_ratio);
+                scattered_ray = Ray(hit_record.hit_point, refracted);
+
+                // never absorbs light
+                return true;
             } 
 
             // unrecognized material integer (likely an error)
