@@ -1,5 +1,7 @@
-- Enable velocity
+- Enable setting geometry from Rust side
 - Enable focal distance (increase aperture size), and have camera automatically focus whatever is immediately in sight
+- Cleanup the data structures around setting uniforms and also adding ui listeners, etc.
+- Enable velocity
 - Only run update_pipeline once before actually rendering
 - Limit aspect ratio of window? (to prevent performance issues on very large screens)
 - Enable collision detection for camera (to prevent moving into bodies on accident)
