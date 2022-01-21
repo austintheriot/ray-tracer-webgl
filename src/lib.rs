@@ -49,6 +49,19 @@ impl KeydownMap {
     }
 }
 
+struct Material {
+    material_type: i32,
+    albedo: Vec3,          // or "reflectance"
+    fuzz: f32,             // used for duller metals
+    refraction_index: f32, // used for glass
+}
+
+struct Sphere {
+    center: Vec3,
+    radius: f32,
+    material: Material,
+}
+
 #[derive(PartialEq, Clone)]
 struct State {
     width: u32,
@@ -587,6 +600,17 @@ pub async fn fetch_shader(url: &str) -> Result<String, JsValue> {
     Ok(text)
 }
 
+pub fn transform_fragment_shader(fragment_shader_source: String) -> String {
+    let re = regex::Regex::new(r"__GEOMETRY__").unwrap();
+    let split = re.split(&fragment_shader_source);
+
+    for (i, str) in split.enumerate() {
+        info!("split number {i} = {:?} \n\n\n\n", str);
+    }
+
+    return fragment_shader_source;
+}
+
 pub async fn async_main() -> Result<(), JsValue> {
     // GET ELEMENTS
     let window = window();
@@ -697,6 +721,9 @@ pub async fn async_main() -> Result<(), JsValue> {
     //  SETUP PROGRAM
     let (fragment_source, vertex_source) =
         try_join!(fetch_shader("./shader.frag"), fetch_shader("./shader.vert"))?;
+
+    let fragment_source = transform_fragment_shader(fragment_source);
+
     let vertex_shader = compile_shader(&gl, WebGl2RenderingContext::VERTEX_SHADER, &vertex_source)?;
     let fragment_shader = compile_shader(
         &gl,

@@ -41,6 +41,7 @@ in vec2 v_position;
 out vec4 o_color;
 
 // video frame, received as a 2d texture
+__GEOMETRY__
 uniform sampler2D u_texture;
 uniform float u_width;
 uniform float u_height;
@@ -145,7 +146,7 @@ bool hit_sphere(in Sphere sphere, in Ray r, in float t_min, in float t_max, inou
   if (discriminant < 0.)
     return false;
 
-// there was a hit, but it's not within an acceptable range
+  // there was a hit, but it's not within an acceptable range
   float sqrtd = sqrt(discriminant);
   float root = (-half_b - sqrtd) / a;
   if (root < t_min || t_max < root) {
