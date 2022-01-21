@@ -35,7 +35,7 @@
       </script>
 
     <script id="fragment-shader" type="x-shader/x-fragment">#version 300 es
-        precision highp float;
+        precision mediump float;
 
         // PSEUDO-RANDOM NUMBER GENERATORS //////////////////////////////////////////////////////
         // Hash functions by Nimitz:
@@ -191,12 +191,19 @@
 
         bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
             // compose the scene (hardcoded for now)
+            // diffuse ground
             Sphere ground =  Sphere(vec3(0., -100.5, -1.),  100., Material(0, vec3(0.75, 0.6, 0.5), 0., 0.));
+            // diffuse blue
             Sphere center = Sphere(vec3(0., 0., -1.), 0.5, Material(0, vec3(0.3, 0.3, 0.4), 0., 0.));
-            Sphere left = Sphere(vec3(-1., 0., -1.), 0.5, Material(2, vec3(1., 1., 1.), 0., 1.5));
+            // solid glass
+            Sphere left = Sphere(vec3(-1., 0., 0.), 0.5, Material(2, vec3(1., 1., 1.), 0., 1.5));
+            // hollow glass
+            Sphere behind = Sphere(vec3(0., 0., 1.), -0.5, Material(2, vec3(1., 1., 1.), 0., 1.5));
+            // small shiny metal
             Sphere left_small = Sphere(vec3(-0.45, -0.4, -0.7), 0.1, Material(1, vec3(1., 1., 1.), 0., 0.));
-            Sphere right = Sphere(vec3(1., 0., -1.), 0.5, Material(1, vec3(1., 1., 1.), 0.5, 0.));
-            Sphere sphere_list[] = Sphere[5](center, left, left_small, right, ground);
+            // dull metal
+            Sphere right = Sphere(vec3(1., 0., 0.), 0.5, Material(1, vec3(1., 1., 1.), 0.5, 0.));
+            Sphere sphere_list[] = Sphere[6](center, left, behind, left_small, right, ground);
             
             // test whether any geometry was hit. If it was, the hit_record will be updated with
             // the new hit data if the new hit was closer to the camera than the previous hit
