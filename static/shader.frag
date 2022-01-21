@@ -1,19 +1,24 @@
 #version 300 es
-
 precision mediump float;
 
+#define PI 3.141592653589793
+#define MAX_T 1e5
+#define MIN_T 0.001
+
 // PSEUDO-RANDOM NUMBER GENERATORS //////////////////////////////////////////////////////
+// global seed is initialized in main, and then each hash function alters 
+// the global seed, increasing the stochasticity of the system
+float global_seed = 0.;
+
 // Hash functions by Nimitz:
 // https://www.shadertoy.com/view/Xt3cDn
-
 uint base_hash(uvec2 p) {
   p = 1103515245U * ((p >> 1U) ^ (p.yx));
   uint h32 = 1103515245U * ((p.x) ^ (p.y >> 3U));
   return h32 ^ (h32 >> 16);
 }
 
-float hash1(inout float seed)
-{
+float hash1(inout float seed) {
     uint n = base_hash(floatBitsToUint(vec2(seed += .1, seed += .1)));
     return float(n)*(1.0/float(0xffffffffU));
 }
@@ -64,10 +69,11 @@ struct Ray {
   vec3 direction;
 };
 
+// Material types
+#define DIFFUSE 0
+#define METAL 1
+#define GLASS 2
 struct Material {
-// 0 = Diffuse
-// 1 = Metal
-// 2 = glass
   int type;
   vec3 albedo; // or "reflectance"
   float fuzz; // used for duller metals
@@ -87,12 +93,6 @@ struct HitRecord {
   bool front_face;
   Material material;
 };
-
-// GLOBALS ////////////////////////////////////////////////////////
-const float PI = 3.141592653589793;
-const float MAX_T = 1e5;
-const float MIN_T = 0.001;
-float global_seed = 0.;
 
 // FUNCTIONS //////////////////////////////////////////////////////
 vec3 ray_at(in Ray r, float hit_t) {
@@ -134,13 +134,6 @@ void set_hit_record_front_face(inout HitRecord hit_record, in Ray r, in vec3 out
   }
 }
 
-vec3 refract(in vec3 uv, in vec3 normal, float eta_i_over_eta_t) {
-  float cos_theta = min(dot(-uv, normal), 1.);
-  vec3 r_out_perp = eta_i_over_eta_t * (uv + cos_theta * normal);
-  vec3 r_out_parallel = -sqrt(abs(1.0 - length_squared(r_out_perp))) * normal;
-  return r_out_perp + r_out_parallel;
-}
-
 bool hit_sphere(in Sphere sphere, in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
   vec3 oc = r.origin - sphere.center;
   float a = length_squared(r.direction);
@@ -173,17 +166,17 @@ bool hit_sphere(in Sphere sphere, in Ray r, in float t_min, in float t_max, inou
 bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
   // compose the scene (hardcoded for now)
   // diffuse ground
-  Sphere ground = Sphere(vec3(0., -100.5, -1.), 100., Material(0, vec3(0.75, 0.6, 0.5), 0., 0.));
+  Sphere ground = Sphere(vec3(0., -100.5, -1.), 100., Material(DIFFUSE, vec3(0.75, 0.6, 0.5), 0., 0.));
   // diffuse blue
-  Sphere center = Sphere(vec3(0., 0., -1.), 0.5, Material(0, vec3(0.3, 0.3, 0.4), 0., 0.));
+  Sphere center = Sphere(vec3(0., 0., -1.), 0.5, Material(DIFFUSE, vec3(0.3, 0.3, 0.4), 0., 0.));
   // solid glass
-  Sphere left = Sphere(vec3(-1., 0., 0.), 0.5, Material(2, vec3(1., 1., 1.), 0., 1.5));
+  Sphere left = Sphere(vec3(-1., 0., 0.), 0.5, Material(GLASS, vec3(1., 1., 1.), 0., 1.5));
   // hollow glass
-  Sphere behind = Sphere(vec3(0., 0., 1.), -0.5, Material(2, vec3(1., 1., 1.), 0., 1.5));
+  Sphere behind = Sphere(vec3(0., 0., 1.), -0.5, Material(GLASS, vec3(1., 1., 1.), 0., 1.5));
   // small shiny metal
-  Sphere left_small = Sphere(vec3(-0.45, -0.4, -0.7), 0.1, Material(1, vec3(1., 1., 1.), 0., 0.));
+  Sphere left_small = Sphere(vec3(-0.45, -0.4, -0.7), 0.1, Material(METAL, vec3(1., 1., 1.), 0., 0.));
   // dull metal
-  Sphere right = Sphere(vec3(1., 0., 0.), 0.5, Material(1, vec3(1., 1., 1.), 0.5, 0.));
+  Sphere right = Sphere(vec3(1., 0., 0.), 0.5, Material(METAL, vec3(1., 1., 1.), 0.5, 0.));
   Sphere sphere_list[] = Sphere[6] (center, left, behind, left_small, right, ground);
 
   // test whether any geometry was hit. If it was, the hit_record will be updated with
@@ -209,11 +202,6 @@ bool near_zero(in vec3 v) {
   return (v.x < low_extreme) && (v.y < low_extreme) && (v.z < low_extreme);
 }
 
-// returns the new direction ray after a reflection
-vec3 reflect(in vec3 v, in vec3 normal) {
-  return v - 2. * dot(v, normal) * normal;
-}
-
 // Schlick's approximation for reflectance
 float reflectance(in float cosine, in float reflection_index) {
   float r0 = pow((1. - reflection_index) / (1. + reflection_index), 2.);
@@ -222,8 +210,8 @@ float reflectance(in float cosine, in float reflection_index) {
 
 // scatters a ray depending on what material was intersected with
 bool scatter(in Ray r, in HitRecord hit_record, out vec3 attenuation, out Ray scattered_ray) {
-  // 0 = diffuse material (lambertian reflection)
-  if (hit_record.material.type == 0) {
+  // DIFFUSE
+  if (hit_record.material.type == DIFFUSE) {
     // color attenuation on reflection
     attenuation = hit_record.material.albedo;
 
@@ -240,8 +228,8 @@ bool scatter(in Ray r, in HitRecord hit_record, out vec3 attenuation, out Ray sc
     return true;
   } 
 
-  // 1 = metal
-  if (hit_record.material.type == 1) {
+  // METAL
+  if (hit_record.material.type == METAL) {
     // color attenuation on reflection
     attenuation = hit_record.material.albedo;
 
@@ -258,8 +246,8 @@ bool scatter(in Ray r, in HitRecord hit_record, out vec3 attenuation, out Ray sc
     return reflected_above_surface;
   } 
 
-  // 2 = glass
-  if (hit_record.material.type == 2) {
+  // GLASS
+  if (hit_record.material.type == GLASS) {
     // color attenuation on reflection
     attenuation = hit_record.material.albedo;
 
@@ -347,16 +335,17 @@ Ray get_ray_from_camera(in vec2 st) {
   return Ray(u_camera_origin + viewport_offset, ray_direction);
 }
 
-void main() {
-  // this seed initialization is by reinder https://www.shadertoy.com/view/llVcDz
+// set up global seed for simmulated randomness
+void init_global_seed() {
+  // I got this seed initialization from reinder https://www.shadertoy.com/view/llVcDz
   global_seed = float(base_hash(floatBitsToUint(v_position))) / float(0xffffffffU) + u_time;
+}
 
-  // get current position on viewport, mapped from -1->1 to 0->1
-  // (i.e. percentage of width, percentage of height)
-  vec2 st = (v_position + 1.) * 0.5;
-
+// accumulates color from each ray and averages them out
+vec3 get_pixel_color(in vec2 st) {
   // accumulate color per pixel
   vec3 color = vec3(0.);
+
   for(int i = 0; i < u_samples_per_pixel; i++) {
     vec2 random = hash2(global_seed);
     vec2 random_within_pixel = random / vec2(u_width, u_height);
@@ -375,20 +364,35 @@ void main() {
   // gamma correction
   color = sqrt(color);
 
+  return color;
+}
+
+// either do a plain render or average this frame with 
+// the previous one, depending on global settings
+void render(in vec3 pixel_color, in vec2 st) {
   vec4 prev_frame = texture(u_texture, st);
   float render_count = float(u_render_count);
-
   if (u_should_average) {
-    // average this frame with previous frames
-    if (prev_frame.a == 0. || u_render_count == 0 || u_render_count == 1) {
-      o_color = vec4(color, 1.);
+    if (prev_frame.a == 0. || u_render_count <= 1) {
+      // not enough data to average, render it straight
+      o_color = vec4(pixel_color, 1.);
     } else {
+      // average this frame with previous frames
       float total_frames = render_count + u_last_frame_weight;
-      vec3 merged_color = (prev_frame.rgb * render_count + color * u_last_frame_weight) / total_frames;
+      vec3 merged_color = (prev_frame.rgb * render_count + pixel_color * u_last_frame_weight) / total_frames;
       o_color = vec4(merged_color, 1.);
     }
   } else {
-    // plain rendering
-    o_color = vec4(color, 1.);
+    // do a plain rendering (no averaging)
+    o_color = vec4(pixel_color, 1.);
   }
+}
+
+void main() {
+  init_global_seed();
+
+  // current position on viewport, mapped from -1->1 to 0->1
+  vec2 st = (v_position + 1.) * 0.5;
+  vec3 pixel_color = get_pixel_color(st);
+  render(pixel_color, st);
 }

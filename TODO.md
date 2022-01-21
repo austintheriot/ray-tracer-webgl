@@ -1,4 +1,6 @@
 - Add comments/clarify glsl code
+- Rename u, v, w to more human-readable names
+- Provide error message for browsers that don't support webgl2
 - Add loading indicator while fetching/compiling shader code
 - Enable setting geometry from Rust side
   - Uniform buffer object?
