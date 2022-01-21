@@ -419,8 +419,6 @@ fn update_render_dimensions_to_match_window(
         )
         .unwrap();
     }
-
-    info!("after {} {}", state.width, state.height);
 }
 
 fn update_moving_fps_array(now: f64, state: &mut MutexGuard<State>, dt: f64) {
