@@ -220,8 +220,16 @@
             return (v.x < low_extreme) && (v.y < low_extreme) && (v.z < low_extreme);
         }
 
+        // returns the new direction ray after a reflection
         vec3 reflect(in vec3 v, in vec3 normal) {
             return v - 2. * dot(v, normal) * normal;
+        }
+
+
+        // Schlick's approximation for reflectance
+        float reflectance(in float cosine, in float reflection_index) {
+            float r0 = pow((1. - reflection_index) / (1. + reflection_index), 2.);
+            return r0 + (1. - r0) * pow((1. - cosine), 5.);
         }
 
         // scatters a ray depending on what material was intersected with
@@ -267,6 +275,7 @@
                 // color attenuation on reflection
                 attenuation = hit_record.material.albedo;
 
+                // refraction differs when colliding from the front or back face
                 float refraction_ratio = hit_record.front_face 
                     ? (1.0 / hit_record.material.refraction_index) 
                     : hit_record.material.refraction_index;
@@ -275,11 +284,23 @@
                 float cos_theta = min(dot(-unit_direction, hit_record.normal), 1.0);
                 float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
 
+                // cannot refract when there is no real solution to Snell's law
                 bool cannot_refract = refraction_ratio * sin_theta > 1.0;
 
+                // there is a random chance of the ray reflecting
+                // --chance increases as reflectance approximation increases
+                float reflectance_amount = reflectance(cos_theta, refraction_ratio);
+                float random_float = hash2(global_seed).x;
+
+                // when the ray cannot refract (or when it's reflectance 
+                // approximation is high), it reflects instead
                 vec3 direction;
-                if (cannot_refract) direction = reflect(unit_direction, hit_record.normal);
-                else direction = refract(unit_direction, hit_record.normal, refraction_ratio);
+                if (cannot_refract || reflectance_amount > random_float) {
+                    direction = reflect(unit_direction, hit_record.normal);
+                }
+                else {
+                    direction = refract(unit_direction, hit_record.normal, refraction_ratio);
+                }
 
                 scattered_ray = Ray(hit_record.hit_point, direction);
 
