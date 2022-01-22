@@ -88,7 +88,7 @@ pub fn handle_mouse_move(e: MouseEvent) {
     let yaw = state.yaw + dx;
     let pitch = state.pitch + dy;
     state.set_camera_angles(yaw, pitch);
-    state::update_focus_distance(&mut state);
+    state::update_cursor_position_in_world(&mut state);
 }
 
 /// Waits until immediately after rendering on the next frame to save the image
