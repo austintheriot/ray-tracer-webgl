@@ -266,7 +266,7 @@ pub fn set_geometry(
 
         let sphere_is_active =
             gl.get_uniform_location(&program, &format!("u_sphere_list[{}].is_active", i));
-        gl.uniform1i(sphere_is_active.as_ref(), true as i32);
+        gl.uniform1i(sphere_is_active.as_ref(), 1);
     }
 }
 

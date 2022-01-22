@@ -56,7 +56,7 @@ struct Sphere {
   vec3 center;
   float radius;
   Material material;
-  bool is_active;
+  int is_active;
 };
 
 struct HitRecord {
@@ -175,7 +175,7 @@ bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_rec
 
   for(int i = 0; i < u_sphere_list.length(); i++) {
     Sphere sphere = u_sphere_list[i];
-    if (!sphere.is_active) {
+    if (sphere.is_active == 0) {
       continue;
     }
 
