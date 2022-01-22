@@ -1,8 +1,10 @@
 use crate::{
     dom,
+    glsl::{Material, MaterialType, Sphere},
     math::{degrees_to_radians, Point, Vec3},
 };
 use std::{f64::consts::PI, sync::MutexGuard};
+use uuid::Uuid;
 use web_sys::{HtmlCanvasElement, WebGl2RenderingContext, WebGlTexture};
 
 pub const MOVEMENT_SPEED: f64 = 0.001;
@@ -21,38 +23,6 @@ impl KeydownMap {
     pub fn all_false(&self) -> bool {
         !self.w && !self.a && !self.s && !self.d && !self.space && !self.shift
     }
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum MaterialType {
-    Diffuse,
-    Metal,
-    Glass,
-}
-
-impl MaterialType {
-    pub fn value(&self) -> i32 {
-        match self {
-            MaterialType::Diffuse => 0,
-            MaterialType::Metal => 1,
-            MaterialType::Glass => 2,
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub struct Material {
-    pub material_type: MaterialType,
-    pub albedo: Vec3,          // or "reflectance"
-    pub fuzz: f32,             // used for duller metals
-    pub refraction_index: f32, // used for glass
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub struct Sphere {
-    pub center: Vec3,
-    pub radius: f32,
-    pub material: Material,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -179,6 +149,7 @@ impl Default for State {
                     fuzz: 0.,
                     refraction_index: 0.,
                 },
+                uuid: Uuid::new_v4(),
             },
             // center (blue)
             Sphere {
@@ -190,6 +161,7 @@ impl Default for State {
                     fuzz: 0.,
                     refraction_index: 0.,
                 },
+                uuid: Uuid::new_v4(),
             },
             // left
             Sphere {
@@ -201,6 +173,7 @@ impl Default for State {
                     fuzz: 0.,
                     refraction_index: 0.,
                 },
+                uuid: Uuid::new_v4(),
             },
             // right
             Sphere {
@@ -212,6 +185,7 @@ impl Default for State {
                     fuzz: 0.,
                     refraction_index: 2.4,
                 },
+                uuid: Uuid::new_v4(),
             },
             // behind
             Sphere {
@@ -223,6 +197,7 @@ impl Default for State {
                     fuzz: 0.5,
                     refraction_index: 0.,
                 },
+                uuid: Uuid::new_v4(),
             },
         ];
 

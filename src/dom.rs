@@ -1,6 +1,7 @@
 use std::sync::MutexGuard;
 
-use crate::{dom, state::State, STATE};
+use crate::{dom, glsl, state::State, STATE};
+use log::info;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{
     Element, Event, HtmlAnchorElement, HtmlButtonElement, HtmlDivElement, KeyboardEvent,
@@ -84,6 +85,8 @@ pub fn handle_mouse_move(e: MouseEvent) {
     let yaw = state.yaw + dx;
     let pitch = state.pitch + dy;
     state.set_camera_angles(yaw, pitch);
+
+    info!("{:#?}", glsl::get_center_hit(&state));
 }
 
 /// Waits until immediately after rendering on the next frame to save the image

@@ -4,7 +4,9 @@ extern crate console_error_panic_hook;
 extern crate lazy_static;
 
 mod dom;
+mod glsl;
 mod math;
+mod ray;
 mod state;
 mod webgl;
 

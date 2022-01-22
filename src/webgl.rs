@@ -235,7 +235,7 @@ pub fn set_geometry(
 
         let sphere_radius_location =
             gl.get_uniform_location(&program, &format!("u_sphere_list[{}].radius", i));
-        gl.uniform1f(sphere_radius_location.as_ref(), sphere.radius);
+        gl.uniform1f(sphere_radius_location.as_ref(), sphere.radius as f32);
 
         let sphere_material_type_location =
             gl.get_uniform_location(&program, &format!("u_sphere_list[{}].material.type", i));
