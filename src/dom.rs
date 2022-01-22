@@ -1,11 +1,9 @@
-use std::sync::MutexGuard;
-
 use crate::{
     dom,
     state::{self, State},
     STATE,
 };
-use log::info;
+use std::sync::MutexGuard;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{
     Element, Event, HtmlAnchorElement, HtmlButtonElement, HtmlDivElement, KeyboardEvent,
@@ -50,7 +48,6 @@ pub fn handle_reset() {
 pub fn handle_keydown(e: KeyboardEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
-    info!("{:?}", e.key());
     match e.key().as_str() {
         "w" => state.keydown_map.w = true,
         "a" => state.keydown_map.a = true,
@@ -174,8 +171,8 @@ pub fn add_listeners() -> Result<(), JsValue> {
         .unwrap()
         .dyn_into::<HtmlButtonElement>()?;
 
-    let disable_button = document
-        .query_selector("#disable")?
+    let cancel_button = document
+        .query_selector("#cancel")?
         .unwrap()
         .dyn_into::<HtmlButtonElement>()?;
 
@@ -238,7 +235,7 @@ pub fn add_listeners() -> Result<(), JsValue> {
     enable_button.set_onclick(Some(handle_enable_button_click.as_ref().unchecked_ref()));
     handle_enable_button_click.forget();
 
-    let handle_disable_button_click = {
+    let handle_cancel_button_click = {
         let backdrop = backdrop.clone();
         let state = STATE.clone();
         Closure::wrap(Box::new(move |_| {
@@ -246,8 +243,8 @@ pub fn add_listeners() -> Result<(), JsValue> {
             (*state).lock().unwrap().is_paused = false;
         }) as Box<dyn FnMut(MouseEvent)>)
     };
-    disable_button.set_onclick(Some(handle_disable_button_click.as_ref().unchecked_ref()));
-    handle_disable_button_click.forget();
+    cancel_button.set_onclick(Some(handle_cancel_button_click.as_ref().unchecked_ref()));
+    handle_cancel_button_click.forget();
 
     let handle_onpointerlockchange = {
         let canvas = canvas.clone();
