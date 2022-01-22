@@ -1,6 +1,6 @@
 use crate::{
     dom,
-    glsl::{Material, MaterialType, Sphere},
+    glsl::{self, HitResult, Material, MaterialType, Sphere},
     math::{degrees_to_radians, Point, Vec3},
 };
 use std::{f64::consts::PI, sync::MutexGuard};
@@ -90,7 +90,7 @@ impl Default for State {
     fn default() -> Self {
         let (width, height) = dom::get_adjusted_screen_dimensions();
         let aspect_ratio = (width as f64) / (height as f64);
-        let aperture = 0.;
+        let aperture = 0.025;
         let focus_distance = 0.75;
         let lens_radius = aperture / 2.0;
 
@@ -371,6 +371,7 @@ pub fn update_position(state: &mut MutexGuard<State>, dt: f64) {
         state.camera_origin -= &vup * MOVEMENT_SPEED * dt * fov;
     }
 
+    update_focus_distance(state);
     state.update_pipeline();
 }
 
@@ -381,4 +382,13 @@ pub fn update_render_globals(state: &mut MutexGuard<State>) {
     }
     state.even_odd_count += 1;
     state.render_count = (state.render_count + 1).min(state.max_render_count);
+}
+
+/// focus on whatever object is selected by the cursor if there was a collision
+pub fn update_focus_distance(state: &mut MutexGuard<State>) {
+    if let HitResult::Hit { data } = glsl::get_center_hit(&state) {
+        let distance = (&data.hit_point - &state.camera_origin).length();
+        state.focus_distance = distance;
+        state.update_pipeline();
+    }
 }

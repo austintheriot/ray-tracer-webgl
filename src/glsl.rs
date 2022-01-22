@@ -215,23 +215,18 @@ pub fn get_center_hit(state: &MutexGuard<State>) -> HitResult {
     };
 
     let mut prev_hit_result = HitResult::NoHit;
+    let mut closest_so_far = f64::INFINITY;
 
     for sphere in spheres {
-        let new_hit_result = sphere.hit(&ray, 0., f64::INFINITY);
+        let new_hit_result = sphere.hit(&ray, 0., closest_so_far);
 
-        // this object was a hit
-        if let HitResult::Hit { data: new_hit_data } = &new_hit_result {
-            // replace saved hit result if previous was no-hit or was behind this new one
-            match &prev_hit_result {
-                HitResult::NoHit => prev_hit_result = new_hit_result,
-                HitResult::Hit {
-                    data: prev_hit_data,
-                } => {
-                    if &new_hit_data.hit_point.z() > &prev_hit_data.hit_point.z() {
-                        prev_hit_result = new_hit_result
-                    }
-                }
-            }
+        // this object was a hit (and implicitly was in front of the last)
+        if let HitResult::Hit {
+            data: ref new_hit_data,
+        } = new_hit_result
+        {
+            closest_so_far = new_hit_data.t;
+            prev_hit_result = new_hit_result;
         }
     }
 
