@@ -35,35 +35,6 @@ vec3 hash3(inout float seed) {
   return vec3(rz & uvec3(0x7fffffffU)) / float(0x7fffffff);
 }
 
-// INPUTS / OUTPUTS //////////////////////////////////////////////////////
-in vec2 v_position;
-
-out vec4 o_color;
-
-// video frame, received as a 2d texture
-__GEOMETRY__
-uniform sampler2D u_texture;
-uniform float u_width;
-uniform float u_height;
-uniform float u_time;
-uniform int u_samples_per_pixel;
-uniform float u_aspect_ratio;
-uniform float u_viewport_height;
-uniform float u_viewport_width;
-uniform float u_focal_length;
-uniform vec3 u_camera_origin;
-uniform vec3 u_horizontal;
-uniform vec3 u_vertical;
-uniform vec3 u_lower_left_corner;
-uniform int u_max_depth;
-uniform int u_render_count;
-uniform bool u_should_average;
-uniform float u_last_frame_weight;
-uniform float u_lens_radius;
-uniform vec3 u_u;
-uniform vec3 u_v;
-uniform vec3 u_w;
-
 // STRUCTS //////////////////////////////////////////////////////
 struct Ray {
   vec3 origin;
@@ -85,6 +56,7 @@ struct Sphere {
   vec3 center;
   float radius;
   Material material;
+  bool is_active;
 };
 
 struct HitRecord {
@@ -94,6 +66,36 @@ struct HitRecord {
   bool front_face;
   Material material;
 };
+
+
+// INPUTS / OUTPUTS //////////////////////////////////////////////////////
+in vec2 v_position;
+
+out vec4 o_color;
+
+// video frame, received as a 2d texture
+uniform sampler2D u_texture;
+uniform float u_width;
+uniform float u_height;
+uniform float u_time;
+uniform int u_samples_per_pixel;
+uniform float u_aspect_ratio;
+uniform float u_viewport_height;
+uniform float u_viewport_width;
+uniform float u_focal_length;
+uniform vec3 u_camera_origin;
+uniform vec3 u_horizontal;
+uniform vec3 u_vertical;
+uniform vec3 u_lower_left_corner;
+uniform int u_max_depth;
+uniform int u_render_count;
+uniform bool u_should_average;
+uniform float u_last_frame_weight;
+uniform float u_lens_radius;
+uniform vec3 u_u;
+uniform vec3 u_v;
+uniform vec3 u_w;
+uniform Sphere[15] u_sphere_list;
 
 // FUNCTIONS //////////////////////////////////////////////////////
 vec3 ray_at(in Ray r, float hit_t) {
@@ -165,35 +167,24 @@ bool hit_sphere(in Sphere sphere, in Ray r, in float t_min, in float t_max, inou
 }
 
 bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_record) {
-  // compose the scene (hardcoded for now)
-  // diffuse ground
-  Sphere ground = Sphere(vec3(0., -100.5, -1.), 100., Material(DIFFUSE, vec3(0.75, 0.6, 0.5), 0., 0.));
-  // diffuse blue
-  Sphere center = Sphere(vec3(0., 0., -1.), 0.5, Material(DIFFUSE, vec3(0.3, 0.3, 0.4), 0., 0.));
-  // solid glass
-  Sphere left = Sphere(vec3(-1., 0., 0.), 0.5, Material(GLASS, vec3(1., 1., 1.), 0., 1.5));
-  // hollow glass
-  Sphere behind = Sphere(vec3(0., 0., 1.), -0.5, Material(GLASS, vec3(1., 1., 1.), 0., 1.5));
-  // small shiny metal
-  Sphere left_small = Sphere(vec3(-0.45, -0.4, -0.7), 0.1, Material(METAL, vec3(1., 1., 1.), 0., 0.));
-  // dull metal
-  Sphere right = Sphere(vec3(1., 0., 0.), 0.5, Material(METAL, vec3(1., 1., 1.), 0.5, 0.));
-  Sphere sphere_list[] = Sphere[6] (center, left, behind, left_small, right, ground);
-
   // test whether any geometry was hit. If it was, the hit_record will be updated with
   // the new hit data if the new hit was closer to the camera than the previous hit
   bool hit_anything = false;
   float closest_so_far = t_max;
   HitRecord temp_hit_record;
 
-  for(int i = 0; i < sphere_list.length(); i++) {
-    Sphere sphere = sphere_list[i];
+  for(int i = 0; i < u_sphere_list.length(); i++) {
+    Sphere sphere = u_sphere_list[i];
+    if (!sphere.is_active) {
+      continue;
+    }
+
     if (hit_sphere(sphere, r, t_min, closest_so_far, temp_hit_record)) {
       hit_anything = true;
       closest_so_far = temp_hit_record.hit_t;
       hit_record = temp_hit_record;
     }
-  }
+  } 
 
   return hit_anything;
 }

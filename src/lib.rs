@@ -49,13 +49,32 @@ impl KeydownMap {
     }
 }
 
+#[derive(Clone, PartialEq, Debug)]
+enum MaterialType {
+    Diffuse,
+    Metal,
+    Glass,
+}
+
+impl MaterialType {
+    fn value(&self) -> i32 {
+        match self {
+            MaterialType::Diffuse => 0,
+            MaterialType::Metal => 1,
+            MaterialType::Glass => 2,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
 struct Material {
-    material_type: i32,
+    material_type: MaterialType,
     albedo: Vec3,          // or "reflectance"
     fuzz: f32,             // used for duller metals
     refraction_index: f32, // used for glass
 }
 
+#[derive(Clone, PartialEq, Debug)]
 struct Sphere {
     center: Vec3,
     radius: f32,
@@ -88,6 +107,7 @@ struct State {
     horizontal: Vec3,
     vertical: Vec3,
     lower_left_corner: Point,
+    sphere_list: Vec<Sphere>,
 
     // RENDER STATE
     /// is the modal up that asks the user to enable first-person viewing mode?
@@ -175,6 +195,64 @@ impl Default for State {
         let prev_fps_update_time = 0.;
         let prev_fps = [0.; 50];
 
+        let sphere_list = vec![
+            // ground
+            Sphere {
+                center: Vec3(0., -100.5, -1.),
+                radius: 100.,
+                material: Material {
+                    material_type: MaterialType::Diffuse,
+                    albedo: Vec3(0.75, 0.6, 0.5),
+                    fuzz: 0.,
+                    refraction_index: 0.,
+                },
+            },
+            // center (blue)
+            Sphere {
+                center: Vec3(0., 0., -1.),
+                radius: 0.5,
+                material: Material {
+                    material_type: MaterialType::Diffuse,
+                    albedo: Vec3(0.3, 0.3, 0.4),
+                    fuzz: 0.,
+                    refraction_index: 0.,
+                },
+            },
+            // left
+            Sphere {
+                center: Vec3(-1., 0., 0.),
+                radius: 0.5,
+                material: Material {
+                    material_type: MaterialType::Metal,
+                    albedo: Vec3(1.0, 1.0, 1.0),
+                    fuzz: 0.,
+                    refraction_index: 0.,
+                },
+            },
+            // right
+            Sphere {
+                center: Vec3(1., 0., 0.),
+                radius: 0.5,
+                material: Material {
+                    material_type: MaterialType::Glass,
+                    albedo: Vec3(1.0, 1.0, 1.0),
+                    fuzz: 0.,
+                    refraction_index: 2.4,
+                },
+            },
+            // behind
+            Sphere {
+                center: Vec3(0., 0., 1.),
+                radius: -0.5,
+                material: Material {
+                    material_type: MaterialType::Metal,
+                    albedo: Vec3(1.0, 1.0, 1.0),
+                    fuzz: 0.5,
+                    refraction_index: 0.,
+                },
+            },
+        ];
+
         State {
             width,
             height,
@@ -217,6 +295,8 @@ impl Default for State {
 
             keydown_map,
             look_sensitivity,
+
+            sphere_list,
         }
     }
 }
@@ -600,15 +680,48 @@ pub async fn fetch_shader(url: &str) -> Result<String, JsValue> {
     Ok(text)
 }
 
-pub fn transform_fragment_shader(fragment_shader_source: String) -> String {
-    let re = regex::Regex::new(r"__GEOMETRY__").unwrap();
-    let split = re.split(&fragment_shader_source);
+// iterates through list of hittable geometry and sets uniforms at initialization time
+fn set_geometry(state: &MutexGuard<State>, gl: &WebGl2RenderingContext, program: &WebGlProgram) {
+    for (i, sphere) in state.sphere_list.iter().enumerate() {
+        let sphere_center_location =
+            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].center", i));
+        gl.uniform3fv_with_f32_array(sphere_center_location.as_ref(), &sphere.center.to_array());
 
-    for (i, str) in split.enumerate() {
-        info!("split number {i} = {:?} \n\n\n\n", str);
+        let sphere_radius_location =
+            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].radius", i));
+        gl.uniform1f(sphere_radius_location.as_ref(), sphere.radius);
+
+        let sphere_material_type_location =
+            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].material.type", i));
+        gl.uniform1i(
+            sphere_material_type_location.as_ref(),
+            sphere.material.material_type.value(),
+        );
+
+        let sphere_material_albedo_location =
+            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].material.albedo", i));
+        gl.uniform3fv_with_f32_array(
+            sphere_material_albedo_location.as_ref(),
+            &sphere.material.albedo.to_array(),
+        );
+
+        let sphere_material_fuzz_location =
+            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].material.fuzz", i));
+        gl.uniform1f(sphere_material_fuzz_location.as_ref(), sphere.material.fuzz);
+
+        let sphere_material_refraction_index_location = gl.get_uniform_location(
+            &program,
+            &format!("u_sphere_list[{}].material.refraction_index", i),
+        );
+        gl.uniform1f(
+            sphere_material_refraction_index_location.as_ref(),
+            sphere.material.refraction_index,
+        );
+
+        let sphere_is_active =
+            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].is_active", i));
+        gl.uniform1i(sphere_is_active.as_ref(), true as i32);
     }
-
-    return fragment_shader_source;
 }
 
 pub async fn async_main() -> Result<(), JsValue> {
@@ -722,8 +835,6 @@ pub async fn async_main() -> Result<(), JsValue> {
     let (fragment_source, vertex_source) =
         try_join!(fetch_shader("./shader.frag"), fetch_shader("./shader.vert"))?;
 
-    let fragment_source = transform_fragment_shader(fragment_source);
-
     let vertex_shader = compile_shader(&gl, WebGl2RenderingContext::VERTEX_SHADER, &vertex_source)?;
     let fragment_shader = compile_shader(
         &gl,
@@ -788,6 +899,11 @@ pub async fn async_main() -> Result<(), JsValue> {
         create_framebuffer(&gl, &textures[0]),
         create_framebuffer(&gl, &textures[1]),
     ];
+
+    // SET GEOMETRY
+    let state = (*STATE).lock().unwrap();
+    set_geometry(&state, &gl, &program);
+    drop(state);
 
     // RENDER LOOP
     let f = Rc::new(RefCell::new(None));
