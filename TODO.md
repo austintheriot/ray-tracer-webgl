@@ -4,7 +4,6 @@
 - Enable mobile viewers to view
 - Enable focal distance (increase aperture size), and have camera automatically focus whatever is immediately in sight
   - This will probably involve doing a single CPU ray-cast through the center of the canvas to find the first object that is hit
-- Cleanup the data structures around setting uniforms and also adding ui listeners, etc.
 - Enable velocity
 - Only run update_pipeline once before actually rendering
 - Enable collision detection for camera (to prevent moving into bodies on accident)

@@ -22,6 +22,8 @@ lazy_static! {
     static ref STATE: Arc<Mutex<State>> = Arc::new(Mutex::new(State::default()));
 }
 
+/// This is the "real" main function, but since it is async, it must
+/// be called by the non-async main function
 pub async fn async_main() -> Result<(), JsValue> {
     // GET ELEMENTS
     let canvas = dom::canvas();
