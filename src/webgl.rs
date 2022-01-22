@@ -6,7 +6,7 @@ use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Request, Response, WebGl2RenderingContext, WebGlFramebuffer, WebGlProgram, WebGlShader,
-    WebGlTexture,
+    WebGlTexture, WebGlUniformLocation,
 };
 
 pub const SIMPLE_QUAD_VERTICES: [f32; 12] = [
@@ -178,6 +178,33 @@ pub fn draw(gl: &WebGl2RenderingContext, state: &MutexGuard<State>) {
     );
 }
 
+pub fn render(
+    gl: &WebGl2RenderingContext,
+    state: &MutexGuard<State>,
+    textures: &[WebGlTexture; 2],
+    framebuffer_objects: &[WebGlFramebuffer; 2],
+) {
+    // use texture previously rendered to
+    gl.bind_texture(
+        WebGl2RenderingContext::TEXTURE_2D,
+        Some(&textures[((state.even_odd_count + 1) % 2) as usize]),
+    );
+
+    // draw to canvas
+    gl.bind_framebuffer(WebGl2RenderingContext::FRAMEBUFFER, None);
+    draw(&gl, &state);
+
+    // only need to draw to framebuffer when doing averages of previous frames
+    if state.should_average {
+        // RENDER (TO FRAMEBUFFER)
+        gl.bind_framebuffer(
+            WebGl2RenderingContext::FRAMEBUFFER,
+            Some(&framebuffer_objects[(state.even_odd_count % 2) as usize]),
+        );
+        draw(&gl, &state);
+    }
+}
+
 pub async fn fetch_shader(url: &str) -> Result<String, JsValue> {
     let request = Request::new_with_str(url)?;
     let resp_value = JsFuture::from(dom::window().fetch_with_request(&request)).await?;
@@ -240,5 +267,311 @@ pub fn set_geometry(
         let sphere_is_active =
             gl.get_uniform_location(&program, &format!("u_sphere_list[{}].is_active", i));
         gl.uniform1i(sphere_is_active.as_ref(), true as i32);
+    }
+}
+
+/// Kind of hacky, but allows setting up uniform names and how to update them once.
+/// The location of each uniform is saved on creation, and then each uniform is updated
+/// automatically on every render
+pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Uniforms {
+    Uniforms::create(
+        gl,
+        program,
+        vec![
+            Uniform {
+                name: "u_texture",
+                updater: Box::new(
+                    |_: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1i(location.as_ref(), 0);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_width",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1f(location.as_ref(), state.width as f32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_height",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1f(location.as_ref(), state.height as f32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_time",
+                updater: Box::new(
+                    |_: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     now: f64| {
+                        gl.uniform1f(location.as_ref(), now as f32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_samples_per_pixel",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        // increase sample rate when paused (such as on first render and when resizing)
+                        // it's ok to do some heavy lifting here, since it's not being continually rendered at this output
+                        let samples_per_pixel = if state.is_paused {
+                            state.samples_per_pixel.max(25)
+                        } else {
+                            state.samples_per_pixel
+                        };
+                        gl.uniform1i(location.as_ref(), samples_per_pixel as i32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_aspect_ratio",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1f(location.as_ref(), state.aspect_ratio as f32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_viewport_height",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1f(location.as_ref(), state.viewport_height as f32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_viewport_width",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1f(location.as_ref(), state.viewport_width as f32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_focal_length",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1f(location.as_ref(), state.focal_length as f32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_camera_origin",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform3fv_with_f32_array(
+                            location.as_ref(),
+                            &state.camera_origin.to_array(),
+                        );
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_horizontal",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform3fv_with_f32_array(
+                            location.as_ref(),
+                            &state.horizontal.to_array(),
+                        );
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_vertical",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform3fv_with_f32_array(location.as_ref(), &state.vertical.to_array());
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_lower_left_corner",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform3fv_with_f32_array(
+                            location.as_ref(),
+                            &state.lower_left_corner.to_array(),
+                        );
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_max_depth",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1i(location.as_ref(), state.max_depth as i32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_render_count",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1i(location.as_ref(), state.render_count as i32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_should_average",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1i(location.as_ref(), state.should_average as i32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_last_frame_weight",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1f(location.as_ref(), state.last_frame_weight as f32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_lens_radius",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1f(location.as_ref(), state.lens_radius as f32);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_u",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform3fv_with_f32_array(location.as_ref(), &state.u.to_array());
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_v",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform3fv_with_f32_array(location.as_ref(), &state.v.to_array());
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_w",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform3fv_with_f32_array(location.as_ref(), &state.w.to_array());
+                    },
+                ),
+            },
+        ],
+    )
+}
+
+pub struct Uniform {
+    pub name: &'static str,
+    pub updater: Box<
+        dyn Fn(&MutexGuard<State>, &Option<WebGlUniformLocation>, &WebGl2RenderingContext, f64),
+    >,
+}
+
+pub struct UniformWithLocation {
+    pub name: &'static str,
+    location: Option<WebGlUniformLocation>,
+    pub updater: Box<
+        dyn Fn(&MutexGuard<State>, &Option<WebGlUniformLocation>, &WebGl2RenderingContext, f64),
+    >,
+}
+
+pub struct Uniforms {
+    pub list: Vec<UniformWithLocation>,
+}
+
+impl Uniforms {
+    // once all uniforms are passed in, their WebGlUniformLocations are looked up
+    // and saved for passing in later when updating
+    pub fn create(
+        gl: &WebGl2RenderingContext,
+        program: &WebGlProgram,
+        uniform_list: Vec<Uniform>,
+    ) -> Self {
+        Uniforms {
+            list: uniform_list
+                .into_iter()
+                .map(|uniform| UniformWithLocation {
+                    location: gl.get_uniform_location(program, uniform.name),
+                    name: uniform.name,
+                    updater: uniform.updater,
+                })
+                .collect(),
+        }
+    }
+
+    // set uniforms with current state
+    pub fn run_setters(&self, state: &MutexGuard<State>, gl: &WebGl2RenderingContext, now: f64) {
+        for uniform in self.list.iter() {
+            (uniform.updater)(state, &uniform.location, gl, now);
+        }
     }
 }

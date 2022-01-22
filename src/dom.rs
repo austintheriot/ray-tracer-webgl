@@ -3,7 +3,8 @@ use std::sync::MutexGuard;
 use crate::{dom, state::State, STATE};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{
-    Element, Event, HtmlButtonElement, HtmlDivElement, KeyboardEvent, MouseEvent, WheelEvent,
+    Element, Event, HtmlAnchorElement, HtmlButtonElement, HtmlDivElement, KeyboardEvent,
+    MouseEvent, WheelEvent,
 };
 
 pub const MAX_CANVAS_SIZE: u32 = 1280;
@@ -85,11 +86,33 @@ pub fn handle_mouse_move(e: MouseEvent) {
     state.set_camera_angles(yaw, pitch);
 }
 
+/// Waits until immediately after rendering on the next frame to save the image
+/// so that the canvas isn't blank
 pub fn handle_save_image(_: MouseEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
     state.should_render = true;
     state.should_save = true;
+}
+
+/// if user has requested to save, save immediately after rendering
+pub fn save_image(state: &mut MutexGuard<State>) {
+    if state.should_save {
+        state.should_save = false;
+        let data_url = canvas()
+            .to_data_url()
+            .unwrap()
+            .replace("image/png", "image/octet-stream");
+        let a = dom::document()
+            .create_element("a")
+            .unwrap()
+            .dyn_into::<HtmlAnchorElement>()
+            .unwrap();
+
+        a.set_href(&data_url);
+        a.set_download("canvas.png");
+        a.click();
+    }
 }
 
 pub fn update_fps_indicator(now: f64, state: &mut MutexGuard<State>) {
