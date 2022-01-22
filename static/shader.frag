@@ -57,6 +57,7 @@ struct Sphere {
   float radius;
   Material material;
   int is_active;
+  int uuid;
 };
 
 struct HitRecord {
@@ -65,6 +66,7 @@ struct HitRecord {
   vec3 normal;
   bool front_face;
   Material material;
+  int uuid;
 };
 
 
@@ -95,6 +97,9 @@ uniform float u_lens_radius;
 uniform vec3 u_u;
 uniform vec3 u_v;
 uniform vec3 u_w;
+uniform int u_enable_debugging;
+uniform int u_selected_object;
+uniform vec3 u_cursor_point;
 uniform Sphere[15] u_sphere_list;
 
 // FUNCTIONS //////////////////////////////////////////////////////
@@ -161,6 +166,7 @@ bool hit_sphere(in Sphere sphere, in Ray r, in float t_min, in float t_max, inou
   hit_record.material = sphere.material;
   hit_record.hit_t = root;
   hit_record.hit_point = ray_at(r, hit_record.hit_t);
+  hit_record.uuid = sphere.uuid;
   vec3 outward_normal = (hit_record.hit_point - sphere.center) / sphere.radius;
   set_hit_record_front_face(hit_record, r, outward_normal);
   return true;
@@ -294,10 +300,25 @@ vec3 ray_color(in Ray r) {
     // hit record gets modified with hit details if there was a hit
     HitRecord hit_record;
     if (hit_world(r, MIN_T, MAX_T, hit_record)) {
+
+      // color using debugging tools
+      if (u_enable_debugging != 0) {
+        // highlight where cursor is intersecting world
+        if (length(hit_record.hit_point - u_cursor_point) < 0.1) {
+          return vec3(0., 0., 1.);
+        }
+
+        // highlight outline of the object that the cursor is hovering on
+        bool is_hit_on_outline = dot(hit_record.normal, r.direction) > -0.05;
+        if (hit_record.uuid == u_selected_object && is_hit_on_outline) {
+          return vec3(1., 0., 0.);
+        }
+      }
+
+      // color using normal ray calculations
       vec3 attenuation;
       Ray scattered_ray;
       bool did_scatter = scatter(r, hit_record, attenuation, scattered_ray);
-
       if (did_scatter) {
         r = scattered_ray;
         color *= attenuation;

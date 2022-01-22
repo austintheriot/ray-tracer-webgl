@@ -264,9 +264,13 @@ pub fn set_geometry(
             sphere.material.refraction_index,
         );
 
-        let sphere_is_active =
+        let sphere_is_active_location =
             gl.get_uniform_location(&program, &format!("u_sphere_list[{}].is_active", i));
-        gl.uniform1i(sphere_is_active.as_ref(), 1);
+        gl.uniform1i(sphere_is_active_location.as_ref(), 1);
+
+        let sphere_uuid_location =
+            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].uuid", i));
+        gl.uniform1i(sphere_uuid_location.as_ref(), sphere.uuid as i32);
     }
 }
 
@@ -522,6 +526,42 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                      gl: &WebGl2RenderingContext,
                      _: f64| {
                         gl.uniform3fv_with_f32_array(location.as_ref(), &state.w.to_array());
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_selected_object",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1i(location.as_ref(), state.selected_object);
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_cursor_point",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform3fv_with_f32_array(
+                            location.as_ref(),
+                            &state.cursor_point.to_array(),
+                        );
+                    },
+                ),
+            },
+            Uniform {
+                name: "u_enable_debugging",
+                updater: Box::new(
+                    |state: &MutexGuard<State>,
+                     location: &Option<WebGlUniformLocation>,
+                     gl: &WebGl2RenderingContext,
+                     _: f64| {
+                        gl.uniform1i(location.as_ref(), state.enable_debugging);
                     },
                 ),
             },

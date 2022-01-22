@@ -4,10 +4,12 @@ use crate::{
     math::{degrees_to_radians, Point, Vec3},
 };
 use std::{f64::consts::PI, sync::MutexGuard};
-use uuid::Uuid;
 use web_sys::{HtmlCanvasElement, WebGl2RenderingContext, WebGlTexture};
 
 pub const MOVEMENT_SPEED: f64 = 0.001;
+
+/// so high that it's unlikely to be a real id of an object in the shader
+pub const NO_SELECTED_OBJECT_ID: i32 = 1000;
 
 #[derive(Default, Debug, PartialEq, Clone)]
 pub struct KeydownMap {
@@ -81,6 +83,11 @@ pub struct State {
     pub keydown_map: KeydownMap,
     pub look_sensitivity: f64,
 
+    // DEBUGGING
+    pub enable_debugging: i32,
+    pub cursor_point: Point,
+    pub selected_object: i32,
+
     // ANALYTICS
     pub prev_fps_update_time: f64,
     pub prev_fps: [f64; 50],
@@ -138,7 +145,7 @@ impl Default for State {
         let prev_fps_update_time = 0.;
         let prev_fps = [0.; 50];
 
-        let sphere_list = vec![
+        let mut sphere_list = vec![
             // ground
             Sphere {
                 center: Vec3(0., -100.5, -1.),
@@ -149,7 +156,7 @@ impl Default for State {
                     fuzz: 0.,
                     refraction_index: 0.,
                 },
-                uuid: Uuid::new_v4(),
+                uuid: 0,
             },
             // center (blue)
             Sphere {
@@ -161,7 +168,7 @@ impl Default for State {
                     fuzz: 0.,
                     refraction_index: 0.,
                 },
-                uuid: Uuid::new_v4(),
+                uuid: 0,
             },
             // left
             Sphere {
@@ -173,7 +180,7 @@ impl Default for State {
                     fuzz: 0.,
                     refraction_index: 0.,
                 },
-                uuid: Uuid::new_v4(),
+                uuid: 0,
             },
             // right
             Sphere {
@@ -185,7 +192,7 @@ impl Default for State {
                     fuzz: 0.,
                     refraction_index: 2.4,
                 },
-                uuid: Uuid::new_v4(),
+                uuid: 0,
             },
             // behind
             Sphere {
@@ -197,9 +204,15 @@ impl Default for State {
                     fuzz: 0.5,
                     refraction_index: 0.,
                 },
-                uuid: Uuid::new_v4(),
+                uuid: 0,
             },
         ];
+
+        let enable_debugging = 0;
+        let cursor_point = Point(0., 0., 0.);
+        let selected_object = NO_SELECTED_OBJECT_ID;
+
+        glsl::set_sphere_uuids(&mut sphere_list);
 
         State {
             width,
@@ -243,6 +256,10 @@ impl Default for State {
 
             keydown_map,
             look_sensitivity,
+
+            enable_debugging,
+            cursor_point,
+            selected_object,
 
             sphere_list,
         }
@@ -389,6 +406,13 @@ pub fn update_focus_distance(state: &mut MutexGuard<State>) {
     if let HitResult::Hit { data } = glsl::get_center_hit(&state) {
         let distance = (&data.hit_point - &state.camera_origin).length();
         state.focus_distance = distance;
+        state.cursor_point = data.hit_point.clone();
+        state.selected_object = data.uuid;
+        state.update_pipeline();
+    } else {
+        state.focus_distance = 10.;
+        state.cursor_point = Point(0., 0., 0.);
+        state.selected_object = NO_SELECTED_OBJECT_ID;
         state.update_pipeline();
     }
 }

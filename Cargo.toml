@@ -20,7 +20,6 @@ console_error_panic_hook = "0.1.7"
 lazy_static = "1.4.0"
 wasm-bindgen-futures = "0.4.29"
 futures = "0.3.19"
-uuid = {version = "0.8.2",  default-features = false, features = ["v4", "wasm-bindgen"]}
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

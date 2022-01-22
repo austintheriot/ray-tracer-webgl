@@ -5,7 +5,6 @@ use super::math::{Point, Vec3};
 use crate::{ray::Ray, state::State};
 use js_sys::Math::sqrt;
 use std::sync::MutexGuard;
-use uuid::Uuid;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum MaterialType {
@@ -37,7 +36,7 @@ pub struct Sphere {
     pub center: Vec3,
     pub radius: f64,
     pub material: Material,
-    pub uuid: Uuid,
+    pub uuid: i32,
 }
 
 impl Hit for Sphere {
@@ -82,6 +81,12 @@ impl Hit for Sphere {
     }
 }
 
+pub fn set_sphere_uuids(spheres: &mut Vec<Sphere>) {
+    for (i, sphere) in spheres.iter_mut().enumerate() {
+        sphere.uuid = i as i32;
+    }
+}
+
 #[derive(Debug)]
 pub enum HitResult {
     Hit { data: HitResultData },
@@ -94,7 +99,7 @@ pub struct HitResultData {
     pub normal: Vec3,
     pub t: f64,
     pub front_face: bool,
-    pub uuid: Uuid,
+    pub uuid: i32,
 }
 
 impl HitResultData {
@@ -109,7 +114,7 @@ pub struct HitResultDataBuilder {
     t: f64,
     normal: Vec3,
     front_face: bool,
-    uuid: Uuid,
+    uuid: i32,
 }
 
 impl HitResultDataBuilder {
@@ -127,7 +132,7 @@ impl HitResultDataBuilder {
         self
     }
 
-    pub fn uuid(mut self, uuid: Uuid) -> Self {
+    pub fn uuid(mut self, uuid: i32) -> Self {
         self.uuid = uuid;
         self
     }
