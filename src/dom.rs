@@ -5,6 +5,7 @@ use crate::{
     state::{self, State},
     STATE,
 };
+use log::info;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{
     Element, Event, HtmlAnchorElement, HtmlButtonElement, HtmlDivElement, KeyboardEvent,
@@ -49,6 +50,7 @@ pub fn handle_reset() {
 pub fn handle_keydown(e: KeyboardEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
+    info!("{:?}", e.key());
     match e.key().as_str() {
         "w" => state.keydown_map.w = true,
         "a" => state.keydown_map.a = true,
@@ -56,8 +58,31 @@ pub fn handle_keydown(e: KeyboardEvent) {
         "d" => state.keydown_map.d = true,
         " " => state.keydown_map.space = true,
         "Shift" => state.keydown_map.shift = true,
+        "Escape" => show_pause_screen(&mut state),
         _ => {}
     }
+}
+
+pub fn hide_pause_screen(state: &mut MutexGuard<State>) {
+    let backdrop = document()
+        .query_selector("#backdrop")
+        .unwrap()
+        .unwrap()
+        .dyn_into::<HtmlDivElement>()
+        .unwrap();
+    backdrop.class_list().add_1("hide").unwrap();
+    state.is_paused = false;
+}
+
+pub fn show_pause_screen(state: &mut MutexGuard<State>) {
+    let backdrop = document()
+        .query_selector("#backdrop")
+        .unwrap()
+        .unwrap()
+        .dyn_into::<HtmlDivElement>()
+        .unwrap();
+    backdrop.class_list().remove_1("hide").unwrap();
+    state.is_paused = true;
 }
 
 pub fn handle_resize() {
@@ -149,6 +174,11 @@ pub fn add_listeners() -> Result<(), JsValue> {
         .unwrap()
         .dyn_into::<HtmlButtonElement>()?;
 
+    let disable_button = document
+        .query_selector("#disable")?
+        .unwrap()
+        .dyn_into::<HtmlButtonElement>()?;
+
     let save_image_button = document
         .query_selector("#save-image")?
         .unwrap()
@@ -208,21 +238,30 @@ pub fn add_listeners() -> Result<(), JsValue> {
     enable_button.set_onclick(Some(handle_enable_button_click.as_ref().unchecked_ref()));
     handle_enable_button_click.forget();
 
+    let handle_disable_button_click = {
+        let backdrop = backdrop.clone();
+        let state = STATE.clone();
+        Closure::wrap(Box::new(move |_| {
+            backdrop.class_list().add_1("hide").unwrap();
+            (*state).lock().unwrap().is_paused = false;
+        }) as Box<dyn FnMut(MouseEvent)>)
+    };
+    disable_button.set_onclick(Some(handle_disable_button_click.as_ref().unchecked_ref()));
+    handle_disable_button_click.forget();
+
     let handle_onpointerlockchange = {
         let canvas = canvas.clone();
         let document = document.clone();
-        let state = STATE.clone();
         Closure::wrap(Box::new(move |_| {
+            let mut state = (*STATE).lock().unwrap();
             if let Some(pointer_lock_element) = document.pointer_lock_element() {
                 let canvas_as_element: &Element = canvas.as_ref();
                 if &pointer_lock_element == canvas_as_element {
-                    backdrop.class_list().add_1("hide").unwrap();
-                    (*state).lock().unwrap().is_paused = false;
+                    hide_pause_screen(&mut state);
                     return;
                 }
             }
-            backdrop.class_list().remove_1("hide").unwrap();
-            (*state).lock().unwrap().is_paused = true;
+            show_pause_screen(&mut state);
         }) as Box<dyn FnMut(Event)>)
     };
     document.set_onpointerlockchange(Some(handle_onpointerlockchange.as_ref().unchecked_ref()));

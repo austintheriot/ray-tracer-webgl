@@ -1,7 +1,6 @@
 - Rename u, v, w to more human-readable names
 - Provide error message for browsers that don't support webgl2
 - Add loading indicator while fetching/compiling shader code
-- Enable mobile viewers to view
 - Enable velocity
 - Only run update_pipeline once before actually rendering
 - Enable collision detection for camera (to prevent moving into bodies on accident)
