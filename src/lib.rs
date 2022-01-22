@@ -32,6 +32,7 @@ pub const BYTES_PER_PIXEL: u32 = 4;
 pub const LOOK_SENSITIVITY: f64 = 1.;
 pub const MOVEMENT_SPEED: f64 = 0.001;
 pub const VELOCITY_DAMPING: f64 = 0.5;
+pub const MAX_CANVAS_SIZE: u32 = 1280;
 
 #[derive(Default, Debug, PartialEq, Clone)]
 struct KeydownMap {
@@ -144,8 +145,7 @@ struct State {
 
 impl Default for State {
     fn default() -> Self {
-        let width = window().inner_width().unwrap().as_f64().unwrap() as u32;
-        let height = window().inner_height().unwrap().as_f64().unwrap() as u32;
+        let (width, height) = get_adjusted_screen_dimensions();
         let aspect_ratio = (width as f64) / (height as f64);
         let aperture = 0.;
         let focus_distance = 0.75;
@@ -356,6 +356,24 @@ pub const SIMPLE_QUAD_VERTICES: [f32; 12] = [
     -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
 ];
 
+// limit max canvas dimensions to a reasonable number
+// (to prevent off-the-charts GPU work on large screen sizes)
+fn get_adjusted_screen_dimensions() -> (u32, u32) {
+    let raw_screen_width = window().inner_width().unwrap().as_f64().unwrap();
+    let raw_screen_height = window().inner_height().unwrap().as_f64().unwrap();
+    let aspect_ratio = raw_screen_width / raw_screen_height;
+
+    return if raw_screen_width > raw_screen_height {
+        let adjusted_width = raw_screen_width.min(MAX_CANVAS_SIZE as f64);
+        let adjusted_height = adjusted_width / aspect_ratio;
+        (adjusted_width as u32, adjusted_height as u32)
+    } else {
+        let adjusted_height = raw_screen_width.min(MAX_CANVAS_SIZE as f64);
+        let adjusted_width = adjusted_height * aspect_ratio;
+        (adjusted_width as u32, adjusted_height as u32)
+    };
+}
+
 fn compile_shader(
     gl: &WebGl2RenderingContext,
     shader_type: u32,
@@ -510,8 +528,9 @@ fn update_render_dimensions_to_match_window(
 ) {
     // update state
     state.last_resize_time = now;
-    state.width = window().inner_width().unwrap().as_f64().unwrap() as u32;
-    state.height = window().inner_height().unwrap().as_f64().unwrap() as u32;
+    let (width, height) = get_adjusted_screen_dimensions();
+    state.width = width;
+    state.height = height;
     state.update_pipeline();
 
     // sync width/height-dependent objects with state
