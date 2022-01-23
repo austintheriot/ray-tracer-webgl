@@ -29,6 +29,7 @@ pub struct Material {
     pub albedo: Vec3,          // or "reflectance"
     pub fuzz: f32,             // used for duller metals
     pub refraction_index: f32, // used for glass
+    pub emit: Vec3,            // what color light the material emits
 }
 
 #[derive(Clone, PartialEq, Debug)]

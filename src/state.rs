@@ -125,7 +125,7 @@ impl Default for State {
             &camera_origin - &horizontal / 2. - &vertical / 2. - focus_distance * &w;
 
         let samples_per_pixel = 1;
-        let max_depth = 10;
+        let max_depth = 5;
         let should_average = true;
         let should_render = true;
         let should_save = false;
@@ -155,6 +155,7 @@ impl Default for State {
                     albedo: Vec3(0.75, 0.6, 0.5),
                     fuzz: 0.,
                     refraction_index: 0.,
+                    emit: Vec3(0., 0., 0.),
                 },
                 uuid: 0,
             },
@@ -167,6 +168,7 @@ impl Default for State {
                     albedo: Vec3(0.3, 0.3, 0.4),
                     fuzz: 0.,
                     refraction_index: 0.,
+                    emit: Vec3(0., 0., 0.),
                 },
                 uuid: 0,
             },
@@ -179,6 +181,7 @@ impl Default for State {
                     albedo: Vec3(1.0, 1.0, 1.0),
                     fuzz: 0.,
                     refraction_index: 0.,
+                    emit: Vec3(0., 0., 0.),
                 },
                 uuid: 0,
             },
@@ -191,6 +194,7 @@ impl Default for State {
                     albedo: Vec3(1.0, 1.0, 1.0),
                     fuzz: 0.,
                     refraction_index: 2.4,
+                    emit: Vec3(0., 0., 0.),
                 },
                 uuid: 0,
             },
@@ -203,6 +207,33 @@ impl Default for State {
                     albedo: Vec3(1.0, 1.0, 1.0),
                     fuzz: 0.5,
                     refraction_index: 0.,
+                    emit: Vec3(0., 0., 0.),
+                },
+                uuid: 0,
+            },
+            // light above
+            Sphere {
+                center: Vec3(1., 1.5, 0.),
+                radius: 0.5,
+                material: Material {
+                    material_type: MaterialType::Diffuse,
+                    albedo: Vec3(0., 0., 0.),
+                    fuzz: 0.,
+                    refraction_index: 0.,
+                    emit: Vec3(20., 20., 20.),
+                },
+                uuid: 0,
+            },
+            // light from side
+            Sphere {
+                center: Vec3(-1.5, 0., 1.5),
+                radius: 0.5,
+                material: Material {
+                    material_type: MaterialType::Diffuse,
+                    albedo: Vec3(0., 0., 0.),
+                    fuzz: 0.,
+                    refraction_index: 0.,
+                    emit: Vec3(20., 20., 20.),
                 },
                 uuid: 0,
             },

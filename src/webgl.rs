@@ -264,6 +264,13 @@ pub fn set_geometry(
             sphere.material.refraction_index,
         );
 
+        let sphere_material_emit_location =
+            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].material.emit", i));
+        gl.uniform3fv_with_f32_array(
+            sphere_material_emit_location.as_ref(),
+            &sphere.material.emit.to_array(),
+        );
+
         let sphere_is_active_location =
             gl.get_uniform_location(&program, &format!("u_sphere_list[{}].is_active", i));
         gl.uniform1i(sphere_is_active_location.as_ref(), 1);
