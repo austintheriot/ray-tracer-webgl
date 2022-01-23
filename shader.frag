@@ -50,6 +50,7 @@ struct Material {
   vec3 albedo; // or "reflectance"
   float fuzz; // used for duller metals
   float refraction_index; // used for glass
+  vec3 emit; // what color light it emits
 };
 
 struct Sphere {
@@ -67,6 +68,7 @@ struct HitRecord {
   bool front_face;
   Material material;
   int uuid;
+  vec3 emit;
 };
 
 
@@ -167,6 +169,7 @@ bool hit_sphere(in Sphere sphere, in Ray r, in float t_min, in float t_max, inou
   hit_record.hit_t = root;
   hit_record.hit_point = ray_at(r, hit_record.hit_t);
   hit_record.uuid = sphere.uuid;
+  hit_record.emit = sphere.material.emit;
   vec3 outward_normal = (hit_record.hit_point - sphere.center) / sphere.radius;
   set_hit_record_front_face(hit_record, r, outward_normal);
   return true;
@@ -283,17 +286,10 @@ bool scatter(in Ray r, in HitRecord hit_record, out vec3 attenuation, out Ray sc
   return false;
 }
 
-// default background color when no intersection color was found
-vec3 background(in Ray r) {
-  vec3 unit_direction = normalize(r.direction);
-  float t = 0.5 * (unit_direction.y + 1.0);
-  vec3 gradient = mix(vec3(1.0, 1.0, 1.0), vec3(0.5, 0.7, 1.0), t);
-  return gradient;
-}
-
 // determine the color that a ray should be
 vec3 ray_color(in Ray r) {
-  vec3 color = vec3(1.);
+  vec3 color = vec3(0);
+  vec3 emitted = vec3(0);
 
   for(int i = 0; i < u_max_depth; i++) {
     // test for collisions with any geometry
@@ -315,25 +311,25 @@ vec3 ray_color(in Ray r) {
         }
       }
 
-      // color using normal ray calculations
       vec3 attenuation;
       Ray scattered_ray;
+      // if the first hit is on a light, only emit the light: don't try to multiply times color
+      // borrowed this iterative approach from reinder: https://www.shadertoy.com/view/4tGcWD
+      bool is_first_hit = i == 0;
+      emitted += is_first_hit ? hit_record.emit : color * hit_record.emit;
       bool did_scatter = scatter(r, hit_record, attenuation, scattered_ray);
       if (did_scatter) {
         r = scattered_ray;
-        color *= attenuation;
+        color = is_first_hit ? attenuation : color * attenuation;
       } else {
-        return vec3(0.);
+        return emitted;
       }
-
     } else {
-        // no hit, return the sky gradient background
-      vec3 background_gradient = background(r);
-      return color * background_gradient;
+      return emitted;
     }
   }
 
-  return color;
+  return emitted;
 }
 
 // create ray from camera origin to viewport
