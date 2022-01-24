@@ -234,7 +234,20 @@ impl Default for State {
                     albedo: Vec3(0., 0., 0.),
                     fuzz: 0.,
                     refraction_index: 0.,
-                    emit: Vec3(20., 20., 20.),
+                    emit: Vec3(2., 2., 2.),
+                },
+                uuid: 0,
+            },
+            // light from side
+            Sphere {
+                center: Vec3(1.5, -0.1, -1.),
+                radius: 0.4,
+                material: Material {
+                    material_type: MaterialType::Diffuse,
+                    albedo: Vec3(0., 0., 0.),
+                    fuzz: 0.,
+                    refraction_index: 0.,
+                    emit: Vec3(2., 2., 2.),
                 },
                 uuid: 0,
             },
