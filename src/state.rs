@@ -3,6 +3,7 @@ use crate::{
     glsl::{self, HitResult, Material, MaterialType, Sphere},
     math::{degrees_to_radians, Point, Vec3},
 };
+use log::info;
 use std::{f64::consts::PI, sync::MutexGuard};
 use web_sys::{HtmlCanvasElement, WebGl2RenderingContext, WebGlTexture};
 
@@ -103,9 +104,9 @@ impl Default for State {
 
         let camera_field_of_view = PI / 2.;
         let camera_h = (camera_field_of_view / 2.).tan();
-        let camera_origin = Point(0., 0., 0.);
-        let pitch = 0.;
-        let yaw = -90.; // look down the z axis by default
+        let camera_origin = Point(-0.43, 2.14, -2.08);
+        let pitch = -34.56;
+        let yaw = -280.07;
         let camera_front = Point(
             f64::cos(degrees_to_radians(yaw)) * f64::cos(degrees_to_radians(pitch)),
             f64::sin(degrees_to_radians(pitch)),
@@ -324,6 +325,14 @@ impl State {
             - self.focus_distance * &self.w;
 
         if self != &prev_state {
+            info!(
+                "
+                camera_origin = {:?}
+                pitch = {}
+                yaw = {}
+            ",
+                self.camera_origin, self.pitch, self.yaw
+            );
             self.render_count = 0;
             self.should_render = true;
         }
