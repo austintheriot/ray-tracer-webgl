@@ -182,7 +182,7 @@ bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_rec
   for(int i = 0; i < u_sphere_list.length(); i++) {
     Sphere sphere = u_sphere_list[i];
     if (sphere.is_active == 0) {
-      continue;
+      break;
     }
 
     if (hit_sphere(sphere, r, t_min, closest_so_far, temp_hit_record)) {
@@ -222,7 +222,7 @@ bool scatter(in Ray r, in HitRecord hit_record, out vec3 attenuation, out Ray sc
     // if (near_zero(scatter_direction)) {
     //   scatter_direction = normalize(hit_record.normal + random_unit_vec() * 0.2);
     // }
-    
+
     scattered_ray = Ray(hit_record.hit_point, scatter_direction);
 
     return true;
