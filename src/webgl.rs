@@ -118,7 +118,6 @@ pub fn create_texture(gl: &WebGl2RenderingContext, state: &MutexGuard<State>) ->
         None,
     )
     .unwrap();
-    drop(state);
 
     texture.unwrap()
 }

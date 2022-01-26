@@ -459,7 +459,6 @@ pub fn update_cursor_position_in_world(state: &mut MutexGuard<State>) {
         }
         state.cursor_point = data.hit_point.clone();
         state.selected_object = data.uuid;
-        state.update_pipeline();
     } else {
         if state.aperture > 0. {
             // there is no blurring if aperture is zerp
@@ -467,6 +466,6 @@ pub fn update_cursor_position_in_world(state: &mut MutexGuard<State>) {
         }
         state.cursor_point = Point(0., 0., 0.);
         state.selected_object = NO_SELECTED_OBJECT_ID;
-        state.update_pipeline();
     }
+    state.update_pipeline();
 }

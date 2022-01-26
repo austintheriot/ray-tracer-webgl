@@ -198,7 +198,7 @@ impl Hit for HittableList {
                     HitResult::Hit {
                         data: prev_hit_data,
                     } => {
-                        if &new_hit_data.hit_point.z() > &prev_hit_data.hit_point.z() {
+                        if new_hit_data.hit_point.z() > prev_hit_data.hit_point.z() {
                             prev_hit_result = new_hit_result
                         }
                     }
