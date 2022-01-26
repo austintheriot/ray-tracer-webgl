@@ -34,8 +34,8 @@ pub fn canvas() -> web_sys::HtmlCanvasElement {
 pub fn handle_wheel(e: WheelEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
-    let adjustment = 1. * e.delta_y().signum();
-    let new_value = state.camera_field_of_view * (1. + adjustment * 0.01);
+    let adjustment = 1. + 0.03 * e.delta_y().signum();
+    let new_value = state.camera_field_of_view * adjustment;
     state.set_fov(new_value);
 }
 
