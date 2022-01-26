@@ -49,10 +49,10 @@ pub fn handle_keydown(e: KeyboardEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
     match e.key().as_str() {
-        "w" => state.keydown_map.w = true,
-        "a" => state.keydown_map.a = true,
-        "s" => state.keydown_map.s = true,
-        "d" => state.keydown_map.d = true,
+        "w" | "W" => state.keydown_map.w = true,
+        "a" | "A" => state.keydown_map.a = true,
+        "s" | "S" => state.keydown_map.s = true,
+        "d" | "D" => state.keydown_map.d = true,
         " " => state.keydown_map.space = true,
         "Shift" => state.keydown_map.shift = true,
         "Escape" => show_pause_screen(&mut state),
@@ -92,12 +92,12 @@ pub fn handle_keyup(e: KeyboardEvent) {
     // can take a mutex guard here, because it will never be called while render loop is running
     let mut state = (*STATE).lock().unwrap();
     match e.key().as_str() {
-        "w" => state.keydown_map.w = false,
-        "a" => state.keydown_map.a = false,
-        "s" => state.keydown_map.s = false,
-        "d" => state.keydown_map.d = false,
-        " " => state.keydown_map.space = false,
+        "w" | "W" => state.keydown_map.w = false,
+        "a" | "A" => state.keydown_map.a = false,
+        "s" | "S" => state.keydown_map.s = false,
+        "d" | "D" => state.keydown_map.d = false,
         "Shift" => state.keydown_map.shift = false,
+        " " => state.keydown_map.space = false,
         _ => {}
     }
 }
