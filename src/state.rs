@@ -125,7 +125,7 @@ impl Default for State {
             &camera_origin - &horizontal / 2. - &vertical / 2. - focus_distance * &w;
 
         let samples_per_pixel = 1;
-        let max_depth = 10;
+        let max_depth = 8;
         let should_average = true;
         let should_render = true;
         let should_save = false;
