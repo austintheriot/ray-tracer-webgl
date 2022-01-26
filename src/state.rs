@@ -101,9 +101,9 @@ impl Default for State {
         let focus_distance = 0.75;
         let lens_radius = aperture / 2.0;
 
-        let camera_field_of_view = PI / 2.;
+        let camera_field_of_view = PI / 3.;
         let camera_h = (camera_field_of_view / 2.).tan();
-        let camera_origin = Point(0., 0., 0.);
+        let camera_origin = Point(0., 0., 1.);
         let pitch = 0.;
         let yaw = -90.; // look down the z axis by default
         let camera_front = Point(
@@ -172,7 +172,7 @@ impl Default for State {
             },
             // left
             Sphere {
-                center: Vec3(-1., 0., 0.),
+                center: Vec3(-1.1, 0., -1.),
                 radius: 0.5,
                 material: Material {
                     material_type: MaterialType::Metal,
@@ -184,24 +184,72 @@ impl Default for State {
             },
             // right
             Sphere {
-                center: Vec3(1., 0., 0.),
+                center: Vec3(1.1, 0., -1.),
                 radius: 0.5,
                 material: Material {
                     material_type: MaterialType::Glass,
                     albedo: Vec3(1.0, 1.0, 1.0),
                     fuzz: 0.,
-                    refraction_index: 2.4,
+                    refraction_index: 1.5,
+                },
+                uuid: 0,
+            },
+            // back left (shiny)
+            Sphere {
+                center: Vec3(-0.5, -0.35, -0.55),
+                radius: -0.15,
+                material: Material {
+                    material_type: MaterialType::Metal,
+                    albedo: Vec3(1.0, 1.0, 1.0),
+                    fuzz: 0.,
+                    refraction_index: 0.,
+                },
+                uuid: 0,
+            },
+            // front left (fuzzy)
+            Sphere {
+                center: Vec3(-0.75, -0.4, -0.35),
+                radius: -0.1,
+                material: Material {
+                    material_type: MaterialType::Metal,
+                    albedo: Vec3(1.0, 1.0, 1.0),
+                    fuzz: 0.,
+                    refraction_index: 0.,
                 },
                 uuid: 0,
             },
             // behind
             Sphere {
-                center: Vec3(0., 0., 1.),
-                radius: -0.5,
+                center: Vec3(0., 1.2, 4.),
+                radius: 2.,
                 material: Material {
-                    material_type: MaterialType::Metal,
+                    material_type: MaterialType::Diffuse,
+                    albedo: Vec3(1.0, 0.8, 0.8),
+                    fuzz: 0.,
+                    refraction_index: 0.,
+                },
+                uuid: 0,
+            },
+            // distant (moon)
+            Sphere {
+                center: Vec3(150., 20., -500.),
+                radius: 100.,
+                material: Material {
+                    material_type: MaterialType::Diffuse,
+                    albedo: Vec3(0.95, 0.95, 1.0),
+                    fuzz: 0.,
+                    refraction_index: 0.,
+                },
+                uuid: 0,
+            },
+            // distant moon's moon
+            Sphere {
+                center: Vec3(170., -20., -350.),
+                radius: 30.,
+                material: Material {
+                    material_type: MaterialType::Diffuse,
                     albedo: Vec3(1.0, 1.0, 1.0),
-                    fuzz: 0.5,
+                    fuzz: 0.,
                     refraction_index: 0.,
                 },
                 uuid: 0,
