@@ -283,6 +283,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
         program,
         vec![
             Uniform {
+                location: None,
                 name: "u_texture",
                 updater: Box::new(
                     |_: &MutexGuard<State>,
@@ -294,6 +295,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_width",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -305,6 +307,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_height",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -316,6 +319,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_time",
                 updater: Box::new(
                     |_: &MutexGuard<State>,
@@ -327,6 +331,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_samples_per_pixel",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -345,6 +350,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_aspect_ratio",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -356,6 +362,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_viewport_height",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -367,6 +374,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_viewport_width",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -378,6 +386,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_focal_length",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -389,6 +398,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_camera_origin",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -403,6 +413,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_horizontal",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -417,6 +428,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_vertical",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -428,6 +440,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_lower_left_corner",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -442,6 +455,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_max_depth",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -453,6 +467,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_render_count",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -464,6 +479,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_should_average",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -475,6 +491,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_last_frame_weight",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -486,6 +503,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_lens_radius",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -497,6 +515,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_u",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -508,6 +527,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_v",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -519,6 +539,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_w",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -530,6 +551,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_selected_object",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -541,6 +563,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_cursor_point",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -555,6 +578,7 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
                 ),
             },
             Uniform {
+                location: None,
                 name: "u_enable_debugging",
                 updater: Box::new(
                     |state: &MutexGuard<State>,
@@ -571,13 +595,6 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
 
 pub struct Uniform {
     pub name: &'static str,
-    pub updater: Box<
-        dyn Fn(&MutexGuard<State>, &Option<WebGlUniformLocation>, &WebGl2RenderingContext, f64),
-    >,
-}
-
-pub struct UniformWithLocation {
-    pub name: &'static str,
     location: Option<WebGlUniformLocation>,
     pub updater: Box<
         dyn Fn(&MutexGuard<State>, &Option<WebGlUniformLocation>, &WebGl2RenderingContext, f64),
@@ -585,7 +602,7 @@ pub struct UniformWithLocation {
 }
 
 pub struct Uniforms {
-    pub list: Vec<UniformWithLocation>,
+    pub list: Vec<Uniform>,
 }
 
 impl Uniforms {
@@ -599,7 +616,7 @@ impl Uniforms {
         Uniforms {
             list: uniform_list
                 .into_iter()
-                .map(|uniform| UniformWithLocation {
+                .map(|uniform| Uniform {
                     location: gl.get_uniform_location(program, uniform.name),
                     name: uniform.name,
                     updater: uniform.updater,
