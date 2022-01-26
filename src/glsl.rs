@@ -72,7 +72,7 @@ impl Hit for Sphere {
             .t(root)
             .hit_point(hit_point)
             .front_face_and_normal(ray, &outward_normal)
-            .uuid(self.uuid.clone())
+            .uuid(self.uuid)
             .build();
 
         HitResult::Hit {

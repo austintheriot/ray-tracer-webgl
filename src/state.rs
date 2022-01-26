@@ -283,8 +283,8 @@ impl Default for State {
             camera_field_of_view,
             viewport_height,
             viewport_width,
-            horizontal: horizontal,
-            vertical: vertical,
+            horizontal,
+            vertical,
             lower_left_corner,
 
             is_paused,
@@ -380,7 +380,7 @@ pub fn update_render_dimensions_to_match_window(
     canvas.set_height(state.height);
     gl.viewport(0, 0, state.width as i32, state.height as i32);
     for texture in textures.iter() {
-        gl.bind_texture(WebGl2RenderingContext::TEXTURE_2D, Some(&texture));
+        gl.bind_texture(WebGl2RenderingContext::TEXTURE_2D, Some(texture));
         // load empty texture into gpu -- this will get rendered into later
         gl.tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and_opt_u8_array(
             WebGl2RenderingContext::TEXTURE_2D,
@@ -416,7 +416,7 @@ pub fn update_position(state: &mut MutexGuard<State>, dt: f64) {
     let camera_front = state.camera_front.clone();
     let vup = state.vup.clone();
     // move slower when more "zoomed in"
-    let fov = state.camera_field_of_view.clone();
+    let fov = state.camera_field_of_view;
     if state.keydown_map.w {
         state.camera_origin += &camera_front * MOVEMENT_SPEED * dt * fov;
     }
@@ -451,7 +451,7 @@ pub fn update_render_globals(state: &mut MutexGuard<State>) {
 
 /// focus on whatever object is selected by the cursor if there was a collision
 pub fn update_cursor_position_in_world(state: &mut MutexGuard<State>) {
-    if let HitResult::Hit { data } = glsl::get_center_hit(&state) {
+    if let HitResult::Hit { data } = glsl::get_center_hit(state) {
         let distance = (&data.hit_point - &state.camera_origin).length();
         if state.aperture > 0. {
             // there is no blurring if aperture is zerp

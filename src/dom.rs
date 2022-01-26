@@ -236,7 +236,7 @@ pub fn add_listeners() -> Result<(), JsValue> {
     handle_enable_button_click.forget();
 
     let handle_cancel_button_click = {
-        let backdrop = backdrop.clone();
+        let backdrop = backdrop;
         let state = STATE.clone();
         Closure::wrap(Box::new(move |_| {
             backdrop.class_list().add_1("hide").unwrap();
@@ -279,7 +279,7 @@ pub fn get_adjusted_screen_dimensions() -> (u32, u32) {
     let raw_screen_height = dom::window().inner_height().unwrap().as_f64().unwrap();
     let aspect_ratio = raw_screen_width / raw_screen_height;
 
-    return if raw_screen_width > raw_screen_height {
+    if raw_screen_width > raw_screen_height {
         let adjusted_width = raw_screen_width.min(MAX_CANVAS_SIZE as f64);
         let adjusted_height = adjusted_width / aspect_ratio;
         (adjusted_width as u32, adjusted_height as u32)
@@ -287,7 +287,7 @@ pub fn get_adjusted_screen_dimensions() -> (u32, u32) {
         let adjusted_height = raw_screen_width.min(MAX_CANVAS_SIZE as f64);
         let adjusted_width = adjusted_height * aspect_ratio;
         (adjusted_width as u32, adjusted_height as u32)
-    };
+    }
 }
 
 pub fn request_animation_frame(f: &Closure<dyn FnMut()>) {

@@ -73,7 +73,7 @@ pub async fn setup_program(gl: &WebGl2RenderingContext) -> Result<WebGlProgram, 
         WebGl2RenderingContext::FRAGMENT_SHADER,
         &fragment_source,
     )?;
-    let program = link_program(&gl, &vertex_shader, &fragment_shader)?;
+    let program = link_program(gl, &vertex_shader, &fragment_shader)?;
     gl.use_program(Some(&program));
 
     Ok(program)
@@ -161,7 +161,7 @@ pub fn create_framebuffer(gl: &WebGl2RenderingContext, texture: &WebGlTexture) -
         WebGl2RenderingContext::FRAMEBUFFER,
         WebGl2RenderingContext::COLOR_ATTACHMENT0,
         WebGl2RenderingContext::TEXTURE_2D,
-        Some(&texture),
+        Some(texture),
         0,
     );
     framebuffer_object.unwrap()
@@ -192,7 +192,7 @@ pub fn render(
 
     // draw to canvas
     gl.bind_framebuffer(WebGl2RenderingContext::FRAMEBUFFER, None);
-    draw(&gl, &state);
+    draw(gl, state);
 
     // only need to draw to framebuffer when doing averages of previous frames
     if state.should_average {
@@ -201,7 +201,7 @@ pub fn render(
             WebGl2RenderingContext::FRAMEBUFFER,
             Some(&framebuffer_objects[(state.even_odd_count % 2) as usize]),
         );
-        draw(&gl, &state);
+        draw(gl, state);
     }
 }
 
@@ -230,33 +230,33 @@ pub fn set_geometry(
 ) {
     for (i, sphere) in state.sphere_list.iter().enumerate() {
         let sphere_center_location =
-            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].center", i));
+            gl.get_uniform_location(program, &format!("u_sphere_list[{}].center", i));
         gl.uniform3fv_with_f32_array(sphere_center_location.as_ref(), &sphere.center.to_array());
 
         let sphere_radius_location =
-            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].radius", i));
+            gl.get_uniform_location(program, &format!("u_sphere_list[{}].radius", i));
         gl.uniform1f(sphere_radius_location.as_ref(), sphere.radius as f32);
 
         let sphere_material_type_location =
-            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].material.type", i));
+            gl.get_uniform_location(program, &format!("u_sphere_list[{}].material.type", i));
         gl.uniform1i(
             sphere_material_type_location.as_ref(),
             sphere.material.material_type.value(),
         );
 
         let sphere_material_albedo_location =
-            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].material.albedo", i));
+            gl.get_uniform_location(program, &format!("u_sphere_list[{}].material.albedo", i));
         gl.uniform3fv_with_f32_array(
             sphere_material_albedo_location.as_ref(),
             &sphere.material.albedo.to_array(),
         );
 
         let sphere_material_fuzz_location =
-            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].material.fuzz", i));
+            gl.get_uniform_location(program, &format!("u_sphere_list[{}].material.fuzz", i));
         gl.uniform1f(sphere_material_fuzz_location.as_ref(), sphere.material.fuzz);
 
         let sphere_material_refraction_index_location = gl.get_uniform_location(
-            &program,
+            program,
             &format!("u_sphere_list[{}].material.refraction_index", i),
         );
         gl.uniform1f(
@@ -265,11 +265,11 @@ pub fn set_geometry(
         );
 
         let sphere_is_active_location =
-            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].is_active", i));
+            gl.get_uniform_location(program, &format!("u_sphere_list[{}].is_active", i));
         gl.uniform1i(sphere_is_active_location.as_ref(), 1);
 
         let sphere_uuid_location =
-            gl.get_uniform_location(&program, &format!("u_sphere_list[{}].uuid", i));
+            gl.get_uniform_location(program, &format!("u_sphere_list[{}].uuid", i));
         gl.uniform1i(sphere_uuid_location.as_ref(), sphere.uuid as i32);
     }
 }
@@ -593,12 +593,13 @@ pub fn setup_uniforms(gl: &WebGl2RenderingContext, program: &WebGlProgram) -> Un
     )
 }
 
+pub type UniformUpdater =
+    Box<dyn Fn(&MutexGuard<State>, &Option<WebGlUniformLocation>, &WebGl2RenderingContext, f64)>;
+
 pub struct Uniform {
     pub name: &'static str,
     location: Option<WebGlUniformLocation>,
-    pub updater: Box<
-        dyn Fn(&MutexGuard<State>, &Option<WebGlUniformLocation>, &WebGl2RenderingContext, f64),
-    >,
+    pub updater: UniformUpdater,
 }
 
 pub struct Uniforms {
