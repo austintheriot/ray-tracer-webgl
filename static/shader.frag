@@ -196,7 +196,7 @@ bool hit_world(in Ray r, in float t_min, in float t_max, inout HitRecord hit_rec
 }
 
 bool near_zero(in vec3 v) {
-  float low_extreme = 1e-6;
+  float low_extreme = 0.00001;
   return (v.x < low_extreme) && (v.y < low_extreme) && (v.z < low_extreme);
 }
 
@@ -216,11 +216,13 @@ bool scatter(in Ray r, in HitRecord hit_record, out vec3 attenuation, out Ray sc
     // shoot ray off in random direction again
     vec3 scatter_direction = hit_record.normal + random_unit_vec();
 
+    // ignore when scattered direction becomes close to 0 for now
     // scatter direction can become close to 0 if opposite the normal vector 
     // (which can cause infinities later on)
-    if (near_zero(scatter_direction)) {
-      scatter_direction = hit_record.normal;
-    }
+    // if (near_zero(scatter_direction)) {
+    //   scatter_direction = normalize(hit_record.normal + random_unit_vec() * 0.2);
+    // }
+    
     scattered_ray = Ray(hit_record.hit_point, scatter_direction);
 
     return true;
